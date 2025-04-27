@@ -14,7 +14,7 @@ const IS_EXECUTION_ENABLED = true;    // Establecer en false para solo monitoreo
 const MAX_GAS_PRICE_GWEI = 30;        // Precio máximo de gas para permitir ejecución
 const MAX_SLIPPAGE_PERCENT = 0.5;     // Slippage máximo aceptable
 const MIN_LIQUIDITY_USD = 100000;     // Liquidez mínima para considerar un pool ($100K)
-const FLASH_LOAN_FEE = 0.0009;        // Prima de préstamo flash de AAVE (0.09%)
+const FLASH_LOAN_FEE = 0.0005;        // Prima de préstamo flash de AAVE (0.05%)
 const GAS_LIMIT_ARBITRAGE = 800000;   // Estimación de límite de gas para arbitraje
 
 // Direcciones de contratos desplegados
@@ -532,5 +532,5 @@ async function executeFlashLoan(opportunity: ArbitrageOpportunity): Promise<bool
 // Ejecutar el monitor
 console.log(`🚀 Monitor de Arbitraje FlashLoan v2.0`);
 console.log(`   Ejecución habilitada: ${IS_EXECUTION_ENABLED ? 'Sí' : 'No'}`);
-console.log(`   Umbral de beneficio: $${MIN_PROFIT_USD} (después de todos los gastos)`);
+console.log(`   Umbral de beneficio: $${MIN_PROFIT_USD} (después de todos los costos)`);
 monitor().catch(console.error);
