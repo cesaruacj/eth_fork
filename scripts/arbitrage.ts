@@ -131,9 +131,12 @@ interface ArbitrageOpportunity {
 // Configuración de provider y wallet
 const provider = ethers.provider;
 
-const wallet = process.env.PRIVATE_KEY 
-  ? new ethers.Wallet(process.env.PRIVATE_KEY, provider) 
-  : null;
+let wallet;
+async function initWallet() {
+  const signers = await ethers.getSigners();
+  wallet = signers[0];
+  console.log(`Usando cuenta: ${wallet.address}`);
+}
 
 if (IS_EXECUTION_ENABLED && !wallet) {
   console.warn("⚠️ La ejecución está habilitada pero no se encontró PRIVATE_KEY - solo se monitoreará");
@@ -228,6 +231,9 @@ async function monitor() {
   console.log(`\n🔎 Iniciando monitor de arbitraje para DEXes de Ethereum`);
   
   try {
+    // Inicializar wallet primero
+    await initWallet();
+    
     // Actualizar datos de liquidez primero
     await updateLiquidityData();
     

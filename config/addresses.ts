@@ -44,7 +44,7 @@ export const FACTORIES = {
 
 // Deployed Contracts
 export const DEPLOYED_CONTRACTS = {
-  // Automatically updated by deploy script on 4/27/2025, 9:17:03 PM
+  // Automatically updated by deploy script on 4/27/2025, 9:44:54 PM
   DEX_AGGREGATOR: "0x453439300B6C5C645737324b990f2d51137027bC",
   FLASH_LOAN_ARBITRAGE: "0x7306a649B451AE08781108445425Bd4E8AcF1E00"
 }
