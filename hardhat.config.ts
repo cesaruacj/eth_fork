@@ -36,12 +36,18 @@ const config: HardhatUserConfig = {
       forking: {
         url: RPC_URL || "https://eth-mainnet.g.alchemy.com/v2/JDR4rpYy7x_w4r0Z0P5QV9W-f_H7DqZ7",
       },
-      chainId: 1, // ID de cadena de Ethereum Mainnet
     },
-    // Conexión directa a Mainnet de Ethereum (REAL)
+    //Para desarrollo testnet con SEPOLIA
+    testnet: {
+      url: "https://eth-sepolia.g.alchemy.com/v2/JDR4rpYy7x_w4r0Z0P5QV9W-f_H7DqZ7",
+      chainId: 11155111, // ID de cadena de Ethereum Sepolia Testnet
+      accounts: [`0x${PRIVATE_KEY}`]
+    },
+    // Para desarrollo en Mainnet
     mainnet: {
       url: "https://eth-mainnet.g.alchemy.com/v2/JDR4rpYy7x_w4r0Z0P5QV9W-f_H7DqZ7",
-      accounts: [`0x${PRIVATE_KEY}`],
+      chainId: 1, // ID de cadena de Ethereum Mainnet REAL
+      accounts: [`0x${PRIVATE_KEY}`]
     }
   },
   etherscan: {
@@ -54,7 +60,7 @@ const config: HardhatUserConfig = {
     artifacts: "./artifacts",
   },
   mocha: {
-    timeout: 300000, // 5 minutos
+    timeout: 50000, // 5 minutos
   },
   typechain: {
     outDir: 'typechain-types',
@@ -62,7 +68,7 @@ const config: HardhatUserConfig = {
     alwaysGenerateOverloads: false,
     externalArtifacts: [],
     dontOverrideCompile: true
-  },
+  }
 };
 
 export default config;

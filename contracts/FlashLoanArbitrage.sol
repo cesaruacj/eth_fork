@@ -131,6 +131,13 @@ contract FlashLoanArbitrage is Ownable, ReentrancyGuard, IFlashLoanSimpleReceive
         IERC20(asset).safeApprove(address(POOL), 0); // Limpiar aprobación previa
         IERC20(asset).safeApprove(address(POOL), amountOwing);
 
+        // Transferir cualquier ganancia restante al propietario
+        uint256 remainingBalance = IERC20(asset).balanceOf(address(this));
+        if (remainingBalance > amountOwing) {
+            uint256 profit = remainingBalance - amountOwing;
+            IERC20(asset).safeTransfer(msg.sender, profit);
+        }
+
         emit ArbitrageExecuted(asset, amount, received, profit);
         
         _flashLoanReentrancyGuard = false;

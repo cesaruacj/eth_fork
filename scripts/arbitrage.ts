@@ -32,12 +32,12 @@ async function updateLiquidityData() {
 // ================================
 // Configuration
 // ================================
-const MIN_PROFIT_PERCENT = 0.5;       // Mínimo porcentaje de beneficio antes de costos
-const MIN_PROFIT_USD = 50;            // Mínimo beneficio en USD después de todos los gastos
+const MIN_PROFIT_PERCENT = 0.1;       // Mínimo porcentaje de beneficio antes de costos
+const MIN_PROFIT_USD = 0.5;            // Mínimo beneficio en USD después de todos los gastos
 const IS_EXECUTION_ENABLED = true;    // Establecer en false para solo monitoreo
 const MAX_GAS_PRICE_GWEI = 30;        // Precio máximo de gas para permitir ejecución
-const MAX_SLIPPAGE_PERCENT = 0.5;     // Slippage máximo aceptable
-const MIN_LIQUIDITY_USD = 100000;     // Liquidez mínima para considerar un pool ($100K)
+const MAX_SLIPPAGE_PERCENT = 0.3;     // Slippage máximo aceptable
+const MIN_LIQUIDITY_USD = 50000;     // Liquidez mínima para considerar un pool ($50K)
 const FLASH_LOAN_FEE = 0.0005;        // Prima de préstamo flash de AAVE (0.05%)
 const GAS_LIMIT_ARBITRAGE = 500000;   // Estimación de límite de gas para arbitraje
 
@@ -156,6 +156,42 @@ async function getEthPriceFromChainlink(): Promise<number> {
     console.warn(`⚠️ Error al obtener precio de ETH desde Chainlink: ${error.message}`);
     throw error;
   }
+}
+
+// Add this function before executing the flash loan
+async function validateArbitrageProfitability(opportunity: ArbitrageOpportunity): Promise<boolean> {
+  // Re-check prices right before execution to ensure they haven't changed
+  const buyDexContract = new ethers.Contract(
+    DEX_AGGREGATOR_CONTRACT,
+    ["function getTokenPrice(address token1, address token2, uint8 dexType) view returns (uint256)"],
+    provider
+  );
+  
+  const currentBuyPrice = await buyDexContract.getTokenPrice(
+    opportunity.baseTokenAddress, 
+    opportunity.quoteTokenAddress, 
+    opportunity.buyDexType
+  );
+  
+  const currentSellPrice = await buyDexContract.getTokenPrice(
+    opportunity.baseTokenAddress,
+    opportunity.quoteTokenAddress, 
+    opportunity.sellDexType
+  );
+  
+  // Convert to same format as your opportunity prices
+  const formattedBuyPrice = parseFloat(ethers.utils.formatUnits(currentBuyPrice, 18));
+  const formattedSellPrice = parseFloat(ethers.utils.formatUnits(currentSellPrice, 18));
+  
+  // Calculate current profitability with extra safety margin
+  const currentProfitPercent = ((formattedSellPrice - formattedBuyPrice) / formattedBuyPrice) * 100;
+  const safetyMargin = 0.2; // Additional 0.2% safety margin
+  
+  console.log(`🔄 Re-checking profitability before execution:`);
+  console.log(`   Original: Buy at ${opportunity.buyPrice}, Sell at ${opportunity.sellPrice}, Profit: ${opportunity.profitPercent.toFixed(2)}%`);
+  console.log(`   Current: Buy at ${formattedBuyPrice}, Sell at ${formattedSellPrice}, Profit: ${currentProfitPercent.toFixed(2)}%`);
+  
+  return currentProfitPercent > (MIN_PROFIT_PERCENT + safetyMargin);
 }
 
 // Función principal de monitoreo
@@ -434,8 +470,14 @@ async function findArbitrageOpportunities(prices: TokenPrice[]): Promise<Arbitra
         if (buyPrice.baseToken !== sellPrice.baseToken || 
             buyPrice.quoteToken !== sellPrice.quoteToken) continue;
         
-        // Calcular porcentaje de beneficio
-        const profitPercent = ((sellPrice.price - buyPrice.price) / buyPrice.price) * 100;
+        // Calcular impacto del slippage
+        const slippageImpact = (buyPrice.price * MAX_SLIPPAGE_PERCENT / 100) + 
+                               (sellPrice.price * MAX_SLIPPAGE_PERCENT / 100);
+                               
+        // Ajustar precios para tener en cuenta el slippage
+        const effectiveBuyPrice = buyPrice.price * (1 + MAX_SLIPPAGE_PERCENT / 100);
+        const effectiveSellPrice = sellPrice.price * (1 - MAX_SLIPPAGE_PERCENT / 100);
+        const profitPercent = ((effectiveSellPrice - effectiveBuyPrice) / effectiveBuyPrice) * 100;
         
         // Incluir solo oportunidades significativas
         if (profitPercent > MIN_PROFIT_PERCENT) {
@@ -516,11 +558,20 @@ async function processOpportunities(opportunities: ArbitrageOpportunity[]) {
   if (IS_EXECUTION_ENABLED && wallet) {
     const bestOpportunity = opportunities[0];
     
-    if (bestOpportunity.netProfitUSD > 0) {
-      console.log(`\n⚡ Ejecutando arbitraje de préstamo flash para la mejor oportunidad...`);
-      await executeFlashLoan(bestOpportunity);
+    if (bestOpportunity.netProfitUSD > MIN_PROFIT_USD * 1.5) { // Raise the threshold for execution
+      console.log(`\n⚡ Verificando rentabilidad para la mejor oportunidad...`);
+      
+      // Validate profitability before execution
+      const stillProfitable = await validateArbitrageProfitability(bestOpportunity);
+      
+      if (stillProfitable) {
+        console.log(`\n⚡ Ejecutando arbitraje de préstamo flash para la mejor oportunidad...`);
+        await executeFlashLoan(bestOpportunity);
+      } else {
+        console.log(`\n⚠️ La oportunidad ya no es rentable. Abortando ejecución.`);
+      }
     } else {
-      console.log(`\n⚠️ No hay oportunidades con beneficio neto positivo`);
+      console.log(`\n⚠️ No hay oportunidades con beneficio neto suficiente`);
     }
   }
 }
@@ -565,6 +616,13 @@ async function executeFlashLoan(opportunity: ArbitrageOpportunity): Promise<bool
     
     if (parseFloat(gasPrice) > MAX_GAS_PRICE_GWEI) {
       console.log(`⛔ Precio de gas demasiado alto (${gasPrice} gwei > ${MAX_GAS_PRICE_GWEI} gwei). Abortando.`);
+      return false;
+    }
+    
+    // Validar rentabilidad antes de ejecutar
+    const isProfitable = await validateArbitrageProfitability(opportunity);
+    if (!isProfitable) {
+      console.log(`⛔ Rentabilidad insuficiente después de revalidar. Abortando.`);
       return false;
     }
     

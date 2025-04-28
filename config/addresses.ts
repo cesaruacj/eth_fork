@@ -44,9 +44,9 @@ export const FACTORIES = {
 
 // Deployed Contracts
 export const DEPLOYED_CONTRACTS = {
-  // Automatically updated by deploy script on 4/25/2025, 7:10:44 PM
-  DEX_AGGREGATOR: "0x9cC87998ba85D81e017E6B7662aC00eE2Ab8fe13",
-  FLASH_LOAN_ARBITRAGE: "0xB1fC11F03b084FfF8daE95fA08e8D69ad2547Ec1"
+  // Automatically updated by deploy script on 4/27/2025, 7:03:54 PM
+  DEX_AGGREGATOR: "0x453439300B6C5C645737324b990f2d51137027bC",
+  FLASH_LOAN_ARBITRAGE: "0x7306a649B451AE08781108445425Bd4E8AcF1E00"
 }
 
 
@@ -58,5 +58,5 @@ export const AAVE_V3 = {
 
 //Chainlink Feed Addresses
 export const CHAINLINK_FEEDS = {
-  ETH_USD_FEED_ADDRESS: "0x5f4eC3Df9cbd43714fe2740f5E3616155c5B8419"
+  
 }
