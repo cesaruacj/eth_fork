@@ -7,35 +7,38 @@ const ADDRESSES_PATH = path.resolve(__dirname, "../config/addresses.ts");
 const GAS_FEE_PATH = path.resolve(__dirname, "../data/gasFee.json");
 
 async function main() {
-    // Leer información actual de gas fee y aplicar optimizaciones
-    let gasFeeData;
-    try {
-        const gasFeeFile = fs.readFileSync(GAS_FEE_PATH, 'utf8');
-        gasFeeData = JSON.parse(gasFeeFile).current;
-        console.log("📊 Usando gas fee actual:", {
-            baseFee: `${gasFeeData.baseFeePerGasGwei} Gwei`,
-            maxFee: `${gasFeeData.maxFeePerGasGwei} Gwei`,
-            priorityFee: `${gasFeeData.maxPriorityFeePerGasGwei} Gwei`
-        });
-    } catch (error) {
-        console.warn("⚠️ No se pudo leer gasFee.json, usando valores por defecto");
-        gasFeeData = null;
-    }
-
-    // Configurar opciones de transacción optimizadas para gas
-    const deployOptions = {
-        // Gastos moderados pero eficientes para redes de prueba o hardfork
-        gasLimit: 3000000, // Límite razonable para estos contratos
+    // Declara deployOptions UNA SOLA VEZ al inicio de la función
+    let deployOptions = {
+        // Valores predeterminados
+        gasLimit: 3000000,
     };
 
-    // Si tenemos datos de gas del archivo, usarlos con optimizaciones
-    if (gasFeeData) {
-        // Usar un valor ligeramente superior al baseFee para transacciones rápidas
-        const optimalMaxFee = Math.ceil(gasFeeData.baseFeePerGasGwei * 1.1 * 1e9);
-        const optimalPriorityFee = Math.ceil(gasFeeData.maxPriorityFeePerGasGwei * 0.8 * 1e9);
-        
-        deployOptions.maxFeePerGas = ethers.utils.parseUnits(optimalMaxFee.toString(), "wei");
-        deployOptions.maxPriorityFeePerGas = ethers.utils.parseUnits(optimalPriorityFee.toString(), "wei");
+    const network = await ethers.provider.getNetwork();
+    if (network.name === "localhost") {
+        // Modifica la variable existente en lugar de redeclararla
+        deployOptions.gasPrice = ethers.utils.parseUnits("10", "gwei");
+        console.log("🔧 Usando gas fijo para fork local:", deployOptions);
+    } else {
+        // Leer información actual de gas fee y aplicar optimizaciones
+        let gasFeeData;
+        try {
+            const gasFeeFile = fs.readFileSync(GAS_FEE_PATH, 'utf8');
+            gasFeeData = JSON.parse(gasFeeFile).current;
+            console.log("📊 Usando gas fee actual:", {
+                baseFee: `${gasFeeData.baseFeePerGasGwei} Gwei`,
+                maxFee: `${gasFeeData.maxFeePerGasGwei} Gwei`,
+                priorityFee: `${gasFeeData.maxPriorityFeePerGasGwei} Gwei`
+            });
+            
+            // Usar un valor ligeramente superior al baseFee para transacciones rápidas
+            const optimalMaxFee = Math.ceil(gasFeeData.baseFeePerGasGwei * 1.1 * 1e9);
+            const optimalPriorityFee = Math.ceil(gasFeeData.maxPriorityFeePerGasGwei * 0.8 * 1e9);
+            
+            deployOptions.maxFeePerGas = ethers.utils.parseUnits(optimalMaxFee.toString(), "wei");
+            deployOptions.maxPriorityFeePerGas = ethers.utils.parseUnits(optimalPriorityFee.toString(), "wei");
+        } catch (error) {
+            console.warn("⚠️ No se pudo leer gasFee.json, usando valores por defecto");
+        }
     }
 
     console.log("🚀 Iniciando despliegue con opciones:", deployOptions);

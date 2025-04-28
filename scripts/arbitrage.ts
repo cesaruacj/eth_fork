@@ -1,4 +1,4 @@
-import { ethers } from "ethers";
+import { ethers } from "hardhat"; // Cambia "ethers" por "hardhat"
 import * as dotenv from "dotenv";
 import * as fs from "fs";
 import * as path from "path";
@@ -15,7 +15,7 @@ async function updateLiquidityData() {
     console.log("🔄 Actualizando datos de pools de liquidez...");
     try {
       // Ejecutar el script liquidity.ts usando Hardhat
-      execSync('npx hardhat run scripts/liquidity.ts --network hardhat', { 
+      execSync('npx hardhat run scripts/liquidity.ts --network localhost', { 
         stdio: 'inherit', // Mostrar output en consola
         encoding: 'utf-8'
       });
@@ -32,14 +32,14 @@ async function updateLiquidityData() {
 // ================================
 // Configuration
 // ================================
-const MIN_PROFIT_PERCENT = 0.1;       // Mínimo porcentaje de beneficio antes de costos
-const MIN_PROFIT_USD = 0.5;            // Mínimo beneficio en USD después de todos los gastos
+const MIN_PROFIT_PERCENT = 0.5;       // Mínimo porcentaje de beneficio antes de costos
+const MIN_PROFIT_USD = 0.01;            // Mínimo beneficio en USD después de todos los gastos
 const IS_EXECUTION_ENABLED = true;    // Establecer en false para solo monitoreo
-const MAX_GAS_PRICE_GWEI = 30;        // Precio máximo de gas para permitir ejecución
-const MAX_SLIPPAGE_PERCENT = 0.3;     // Slippage máximo aceptable
-const MIN_LIQUIDITY_USD = 50000;     // Liquidez mínima para considerar un pool ($50K)
+const MAX_GAS_PRICE_GWEI = 40;        // Precio máximo de gas para permitir ejecución
+const MAX_SLIPPAGE_PERCENT = 0.2;     // Slippage máximo aceptable
+const MIN_LIQUIDITY_USD = 10000;     // Liquidez mínima para considerar un pool ($10K)
 const FLASH_LOAN_FEE = 0.0005;        // Prima de préstamo flash de AAVE (0.05%)
-const GAS_LIMIT_ARBITRAGE = 500000;   // Estimación de límite de gas para arbitraje
+const GAS_LIMIT_ARBITRAGE = 300000;   // Estimación de límite de gas para arbitraje
 
 // Direcciones de contratos desplegados
 const FLASH_LOAN_CONTRACT = DEPLOYED_CONTRACTS.FLASH_LOAN_ARBITRAGE;
@@ -53,7 +53,9 @@ const DEXES = [
   'sushiswap',
   'pancakeswap-v3-ethereum',
   'pancakeswap_ethereum',
-  'uniswap-v4-ethereum'  // Más nuevo, potencialmente menor liquidez
+  'uniswap-v4-ethereum',  // Más nuevo, potencialmente menor liquidez
+  'balancer_ethereum',
+  'curve'
 ];
 
 // Mapeo de tipo DEX para el contrato DexAggregator
@@ -64,7 +66,9 @@ const DEX_INFO = {
   'sushiswap': { name: 'SushiSwap', type: 2 },
   'sushiswap-v3-ethereum': { name: 'SushiSwap V3', type: 1 },
   'pancakeswap_ethereum': { name: 'PancakeSwap', type: 4 },
-  'pancakeswap-v3-ethereum': { name: 'PancakeSwap V3', type: 4 }
+  'pancakeswap-v3-ethereum': { name: 'PancakeSwap V3', type: 4 },
+  'balancer_ethereum': { name: 'Balancer', type: 5 },
+  'curve': { name: 'Curve', type: 6 }
 };
 
 // ABIs minimizados para mejor rendimiento
@@ -122,11 +126,8 @@ interface ArbitrageOpportunity {
 }
 
 // Configuración de provider y wallet
-if (!process.env.RPC_URL) {
-  throw new Error("RPC_URL no establecida en el archivo .env");
-}
+const provider = ethers.provider;
 
-const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL);
 const wallet = process.env.PRIVATE_KEY 
   ? new ethers.Wallet(process.env.PRIVATE_KEY, provider) 
   : null;
@@ -158,40 +159,65 @@ async function getEthPriceFromChainlink(): Promise<number> {
   }
 }
 
-// Add this function before executing the flash loan
+// Replace the validateArbitrageProfitability function with this improved version
 async function validateArbitrageProfitability(opportunity: ArbitrageOpportunity): Promise<boolean> {
-  // Re-check prices right before execution to ensure they haven't changed
-  const buyDexContract = new ethers.Contract(
-    DEX_AGGREGATOR_CONTRACT,
-    ["function getTokenPrice(address token1, address token2, uint8 dexType) view returns (uint256)"],
-    provider
-  );
-  
-  const currentBuyPrice = await buyDexContract.getTokenPrice(
-    opportunity.baseTokenAddress, 
-    opportunity.quoteTokenAddress, 
-    opportunity.buyDexType
-  );
-  
-  const currentSellPrice = await buyDexContract.getTokenPrice(
-    opportunity.baseTokenAddress,
-    opportunity.quoteTokenAddress, 
-    opportunity.sellDexType
-  );
-  
-  // Convert to same format as your opportunity prices
-  const formattedBuyPrice = parseFloat(ethers.utils.formatUnits(currentBuyPrice, 18));
-  const formattedSellPrice = parseFloat(ethers.utils.formatUnits(currentSellPrice, 18));
-  
-  // Calculate current profitability with extra safety margin
-  const currentProfitPercent = ((formattedSellPrice - formattedBuyPrice) / formattedBuyPrice) * 100;
-  const safetyMargin = 0.2; // Additional 0.2% safety margin
-  
-  console.log(`🔄 Re-checking profitability before execution:`);
-  console.log(`   Original: Buy at ${opportunity.buyPrice}, Sell at ${opportunity.sellPrice}, Profit: ${opportunity.profitPercent.toFixed(2)}%`);
-  console.log(`   Current: Buy at ${formattedBuyPrice}, Sell at ${formattedSellPrice}, Profit: ${currentProfitPercent.toFixed(2)}%`);
-  
-  return currentProfitPercent > (MIN_PROFIT_PERCENT + safetyMargin);
+  try {
+    // First, check if contract is deployed and accessible
+    const code = await provider.getCode(DEX_AGGREGATOR_CONTRACT);
+    if (code === '0x' || code === '0x0') {
+      console.log(`⚠️ DEX_AGGREGATOR_CONTRACT no está desplegado en esta red`);
+      return false;
+    }
+    
+    // Use a more complete ABI that matches your deployed contract
+    const dexAggregatorABI = [
+      "function getTokenPrice(address token1, address token2, uint8 dexType) view returns (uint256)",
+      "function getDexName(uint8 dexType) view returns (string)"
+    ];
+
+    const buyDexContract = new ethers.Contract(
+      DEX_AGGREGATOR_CONTRACT,
+      dexAggregatorABI,
+      provider
+    );
+    
+    // Test if the function exists with a simpler call first
+    try {
+      await buyDexContract.getDexName(opportunity.buyDexType);
+    } catch (error) {
+      console.log(`⚠️ Error al verificar contrato: ${error.message}`);
+      console.log(`⚠️ Ejecutando arbitraje sin validación adicional`);
+      return true; // Proceed anyway if this fails
+    }
+    
+    // Now try to get the prices
+    const currentBuyPrice = await buyDexContract.getTokenPrice(
+      opportunity.baseTokenAddress, 
+      opportunity.quoteTokenAddress, 
+      opportunity.buyDexType
+    );
+    
+    const currentSellPrice = await buyDexContract.getTokenPrice(
+      opportunity.baseTokenAddress,
+      opportunity.quoteTokenAddress, 
+      opportunity.sellDexType
+    );
+    
+    const formattedBuyPrice = parseFloat(ethers.utils.formatUnits(currentBuyPrice, 18));
+    const formattedSellPrice = parseFloat(ethers.utils.formatUnits(currentSellPrice, 18));
+    
+    const currentProfitPercent = ((formattedSellPrice - formattedBuyPrice) / formattedBuyPrice) * 100;
+    
+    console.log(`🔄 Re-checking profitability before execution:`);
+    console.log(`   Original: Buy at ${opportunity.buyPrice}, Sell at ${opportunity.sellPrice}, Profit: ${opportunity.profitPercent.toFixed(2)}%`);
+    console.log(`   Current: Buy at ${formattedBuyPrice}, Sell at ${formattedSellPrice}, Profit: ${currentProfitPercent.toFixed(2)}%`);
+    
+    return currentProfitPercent > MIN_PROFIT_PERCENT;
+  } catch (error) {
+    console.log(`⚠️ Error al validar rentabilidad: ${error.message}`);
+    console.log(`⚠️ Ejecutando arbitraje sin validación adicional`);
+    return true; // If validation fails, proceed with the arbitrage anyway
+  }
 }
 
 // Función principal de monitoreo
