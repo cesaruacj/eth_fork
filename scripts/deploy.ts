@@ -16,7 +16,7 @@ async function main() {
     const network = await ethers.provider.getNetwork();
     if (network.name === "localhost") {
         // Modifica la variable existente en lugar de redeclararla
-        deployOptions.gasPrice = ethers.utils.parseUnits("10", "gwei");
+        deployOptions.gasPrice = ethers.utils.parseUnits("15", "gwei");
         console.log("🔧 Usando gas fijo para fork local:", deployOptions);
     } else {
         // Leer información actual de gas fee y aplicar optimizaciones

@@ -90,32 +90,60 @@ async function fetchTopPools(dex: string): Promise<{ dex: string; result: DexPoo
   }
 }
 
+// Modificar la función main() para seleccionar los 30 DEXes con mayor liquidez
+
 async function main() {
   console.log(`🔍 Buscando DEXes disponibles en la red ${NETWORK}...`);
   
-  // First get available DEXes
+  // 1. Primero obtener todos los DEXes disponibles
   const availableDexes = await getAvailableDexes();
-  console.log(`📊 DEXes disponibles en ${NETWORK}: ${availableDexes.length}`, availableDexes);
+  console.log(`📊 DEXes disponibles en ${NETWORK}: ${availableDexes.length}`);
   
-  // Check which of our DEXes are available
-  for (const dex of DEXES) {
-    if (availableDexes.includes(dex)) {
-      console.log(`✅ DEX encontrado: ${dex}`);
-    } else {
-      console.log(`❌ DEX no disponible: ${dex}`);
-    }
-  }
+  // 2. Filtrar a los DEXes con mayor liquidez conocida
+  // Estos son los 30 DEXes principales por liquidez total según los datos
+  const topDexes = [
+    'uniswap_v3',          // Enormes pools como ETH/USDC ($108M)
+    'curve',               // Gran liquidez en pools de stablecoins ($176M+)
+    'uniswap_v2',          // Pools establecidos como PEPE/WETH ($34M)
+    'uniswap-v4-ethereum', // Pools importantes ($21M+)
+    'balancer_ethereum',   // Pools grandes ($144M+)
+    'sushiswap',           // Pool de WBTC/WETH ($22M)
+    'ethervista',          // Pool de alta liquidez ($406K+)
+    'x7-finance-ethereum', // Varios pools con liquidez
+    'defi_swap',           // Pool CRO/ETH ($445K)
+    'shibaswap',           // Pool SHIB/WETH ($3.9M)
+    'hopeswap',            // Tiene un pool de $40K
+    'antfarm-ethereum',    // Pool PEPE/USDC ($163K)
+    'smardex-ethereum',    // Pool de $1.9M
+    'sakeswap',            // Tiene varios pools de buena liquidez
+    'radioshack_ethereum', // Liquidez $16K+
+    'solidlydex',          // Pool $20K
+    'unicly',              // Pool de $155K
+    'verse',               // Pool de $1.4M
+    'elk_finance_ethereum',// Pool de $6.8K
+    'standard_ethereum',   // Pequeños pools
+    'swapr_ethereum',      // Pequeños pools
+    'x7-finance',          // Algunos pools pequeños
+    'saitaswap-ethereum',  // Pool de $6K
+    'kyberswap_elastic',   // Algunos pools
+    'apeswap_ethereum',    // Pequeños pools
+    'pancakeswap_ethereum',
+    'pancakeswap-v3-ethereum',
+    'sushiswap-v3-ethereum',
+    'justmoney-ethereum',
+    'kyberswap_classic_ethereum'
+  ];
   
-  // Filter our DEX list to only include available ones
-  const dexesToFetch = DEXES.filter(dex => availableDexes.includes(dex));
-  console.log(`🚀 Consultando datos para ${dexesToFetch.length} DEXes:`, dexesToFetch);
+  // Asegurar que todos los DEXes solicitados existan
+  const dexesToFetch = topDexes.filter(dex => availableDexes.includes(dex));
+  console.log(`🚀 Consultando datos para ${dexesToFetch.length} DEXes de mayor liquidez:`, dexesToFetch);
   
-  // Fetch data only for available DEXes
+  // 3. Obtener datos solo para estos DEXes
   console.log(`📡 Obteniendo pools por volumen para cada DEX...`);
   const allResults = await Promise.all(dexesToFetch.map(fetchTopPools));
 
   // Create output with ALL pools for each DEX (sorted by liquidity)
-  const output = DEXES.reduce<Record<string, DexPoolsResponse>>((acc, dex) => {
+  const output = dexesToFetch.reduce<Record<string, DexPoolsResponse>>((acc, dex) => {
     const result = allResults.find(r => r.dex === dex);
     
     if (result?.result?.data?.length > 0) {
@@ -144,7 +172,7 @@ async function main() {
 
   // Log summary of pools found
   console.log(`\n📋 Resumen de pools encontrados:`);
-  for (const dex of DEXES) {
+  for (const dex of dexesToFetch) {
     const poolCount = output[dex]?.data?.length || 0;
     if (poolCount > 0) {
       const totalLiquidity = output[dex].data.reduce((sum, pool) => {

@@ -6,8 +6,15 @@ import { execSync } from "child_process"; // Añadir esta importación
 import { DEX_ROUTERS, AAVE_V3, DEPLOYED_CONTRACTS } from "../config/addresses";
 dotenv.config();
 
+// ABI de FlashLoanArbitrage.sol
+const { abi: flashLoanArbitrageABI } = require("../artifacts/contracts/FlashLoanArbitrage.sol/FlashLoanArbitrage.json");
+
 // Verificar si se debe actualizar los datos de liquidez antes de iniciar
 const UPDATE_LIQUIDITY_DATA = true; // Puedes convertir esto en una constante de configuración
+
+// Antes de cualquier función, definir como arrays vacíos
+let DEXES = [];
+let DEX_INFO = {};
 
 // Función para actualizar datos de liquidez antes de ejecutar el arbitraje
 async function updateLiquidityData() {
@@ -29,10 +36,37 @@ async function updateLiquidityData() {
   }
 }
 
+// Modificar updateDexInfo para cargar todos los DEXes disponibles
+async function updateDexInfo(dexPoolsData: any) {
+  // Carga los datos de todos los DEXes
+  DEXES = Object.keys(dexPoolsData);
+  console.log(`🔍 Cargados ${DEXES.length} DEXes desde dexespools.json`);
+  
+  // Crear DEX_INFO dinámicamente
+  DEX_INFO = {};
+  for (const dex of DEXES) {
+    // Asignar tipo y nombre por defecto
+    let type = 0;
+    let name = dex.replace(/_/g, ' ').replace(/-/g, ' ');
+    
+    // Asignar tipos específicos para DEXes conocidos
+    if (dex.includes('uniswap_v3') || dex.includes('sushiswap-v3')) type = 1;
+    else if (dex === 'sushiswap') type = 2;
+    else if (dex.includes('uniswap-v4')) type = 3;
+    else if (dex.includes('pancakeswap')) type = 4;
+    else if (dex.includes('balancer')) type = 5;
+    else if (dex === 'curve') type = 6;
+    
+    DEX_INFO[dex] = { name, type };
+  }
+  
+  console.log(`✅ ${Object.keys(DEX_INFO).length} DEXes configurados para arbitraje`);
+}
+
 // ================================
 // Configuration
 // ================================
-const MIN_PROFIT_PERCENT = 0.5;       // Mínimo porcentaje de beneficio antes de costos
+const MIN_PROFIT_PERCENT = 0.001;       // Mínimo porcentaje de beneficio antes de costos
 const MIN_PROFIT_USD = 0.01;            // Mínimo beneficio en USD después de todos los gastos
 const IS_EXECUTION_ENABLED = true;    // Establecer en false para solo monitoreo
 const MAX_GAS_PRICE_GWEI = 40;        // Precio máximo de gas para permitir ejecución
@@ -45,38 +79,7 @@ const GAS_LIMIT_ARBITRAGE = 300000;   // Estimación de límite de gas para arbi
 const FLASH_LOAN_CONTRACT = DEPLOYED_CONTRACTS.FLASH_LOAN_ARBITRAGE;
 const DEX_AGGREGATOR_CONTRACT = DEPLOYED_CONTRACTS.DEX_AGGREGATOR;
 
-// DEXes a monitorear - ordenados por prioridad
-const DEXES = [
-  'uniswap_v3',          // Mayor liquidez y más eficiente
-  'uniswap_v2',          // Pool establecido
-  'sushiswap-v3-ethereum',
-  'sushiswap',
-  'pancakeswap-v3-ethereum',
-  'pancakeswap_ethereum',
-  'uniswap-v4-ethereum',  // Más nuevo, potencialmente menor liquidez
-  'balancer_ethereum',
-  'curve'
-];
-
-// Mapeo de tipo DEX para el contrato DexAggregator
-const DEX_INFO = {
-  'uniswap_v2': { name: 'Uniswap V2', type: 0 },
-  'uniswap_v3': { name: 'Uniswap V3', type: 1 },
-  'uniswap-v4-ethereum': { name: 'Uniswap V4', type: 3 },
-  'sushiswap': { name: 'SushiSwap', type: 2 },
-  'sushiswap-v3-ethereum': { name: 'SushiSwap V3', type: 1 },
-  'pancakeswap_ethereum': { name: 'PancakeSwap', type: 4 },
-  'pancakeswap-v3-ethereum': { name: 'PancakeSwap V3', type: 4 },
-  'balancer_ethereum': { name: 'Balancer', type: 5 },
-  'curve': { name: 'Curve', type: 6 }
-};
-
 // ABIs minimizados para mejor rendimiento
-const flashLoanArbitrageABI = [
-  "function executeFlashLoan(address asset, uint256 amount) external",
-  "function owner() view returns (address)"
-];
-
 const erc20ABI = [
   "function decimals() view returns (uint8)",
   "function symbol() view returns (string)",
@@ -231,6 +234,9 @@ async function monitor() {
     // Cargar datos de pools desde dexespools.json
     const poolData = await loadPoolData();
     
+    // Pasar los datos cargados a updateDexInfo
+    await updateDexInfo(poolData);  
+    
     // Cargar tokens principales
     const tokenList = await loadTopTokens(poolData);
     
@@ -323,13 +329,28 @@ async function loadTopTokens(poolData: any): Promise<Record<string, string>> {
 function extractPrices(dexPoolsData: any, tokenList: Record<string, string>): TokenPrice[] {
   const prices: TokenPrice[] = [];
   
+  // Verificar que DEXES y DEX_INFO estén correctamente inicializados
+  if (!DEXES || DEXES.length === 0) {
+    console.error('⚠️ Error: DEXES no está inicializado. Ejecuta updateDexInfo() primero.');
+    return [];
+  }
+  
+  if (!DEX_INFO || Object.keys(DEX_INFO).length === 0) {
+    console.error('⚠️ Error: DEX_INFO no está inicializado. Ejecuta updateDexInfo() primero.');
+    return [];
+  }
+  
   // Procesar cada DEX
   for (const dexId of DEXES) {
     const dexData = dexPoolsData[dexId];
     if (!dexData?.data?.length || !dexData.included?.length) continue;
     
-    const dexInfo = DEX_INFO[dexId];
-    if (!dexInfo) continue;
+    let dexInfo = DEX_INFO[dexId];
+    if (!dexInfo) {
+      console.warn(`⚠️ No hay información de tipo para DEX ${dexId}, asignando tipo 0 por defecto`);
+      DEX_INFO[dexId] = { name: dexId.replace(/_/g, ' ').replace(/-/g, ' '), type: 0 };
+      dexInfo = DEX_INFO[dexId];
+    }
     
     // Crear un mapa de tokens incluidos para búsqueda rápida
     const includedTokens = new Map();
@@ -667,7 +688,7 @@ async function executeFlashLoan(opportunity: ArbitrageOpportunity): Promise<bool
     );
     
     // Ejecutar préstamo flash
-    const tx = await flashLoanContract.executeFlashLoan(
+    const tx = await flashLoanContract.executeFlashLoanSimple(
       opportunity.flashLoanToken,
       flashLoanAmount,
       {
@@ -708,7 +729,7 @@ async function executeFlashLoan(opportunity: ArbitrageOpportunity): Promise<bool
 }
 
 // Ejecutar el monitor
-console.log(`🚀 Monitor de Arbitraje FlashLoan v2.0`);
+console.log(`🚀 Monitor de Arbitraje FlashLoan v3.0`);
 console.log(`   Ejecución habilitada: ${IS_EXECUTION_ENABLED ? 'Sí' : 'No'}`);
 console.log(`   Umbral de beneficio: $${MIN_PROFIT_USD} (después de todos los costos)`);
 monitor().catch(console.error);
