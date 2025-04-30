@@ -88,7 +88,7 @@ export const DEX_ROUTERS = {
 
 // Deployed Contracts
 export const DEPLOYED_CONTRACTS = {
-  // Automatically updated by deploy script on 4/28/2025, 2:13:07 PM
+  // Automatically updated by deploy script on 4/29/2025, 7:04:34 PM
   DEX_AGGREGATOR: "0x453439300B6C5C645737324b990f2d51137027bC",
   FLASH_LOAN_ARBITRAGE: "0x7306a649B451AE08781108445425Bd4E8AcF1E00"
 }

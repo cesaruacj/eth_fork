@@ -71,7 +71,7 @@ const MIN_PROFIT_USD = 0.01;            // Mínimo beneficio en USD después de 
 const IS_EXECUTION_ENABLED = true;    // Establecer en false para solo monitoreo
 const MAX_GAS_PRICE_GWEI = 40;        // Precio máximo de gas para permitir ejecución
 const MAX_SLIPPAGE_PERCENT = 0.2;     // Slippage máximo aceptable
-const MIN_LIQUIDITY_USD = 10000;     // Liquidez mínima para considerar un pool ($10K)
+const MIN_LIQUIDITY_USD = 5000;     // Liquidez mínima para considerar un pool ($5K)
 const FLASH_LOAN_FEE = 0.0005;        // Prima de préstamo flash de AAVE (0.05%)
 const GAS_LIMIT_ARBITRAGE = 300000;   // Estimación de límite de gas para arbitraje
 
