@@ -16,6 +16,47 @@ const UPDATE_LIQUIDITY_DATA = true; // Puedes convertir esto en una constante de
 let DEXES = [];
 let DEX_INFO = {};
 
+// Add this mapping to the beginning of your arbitrage.ts script
+// This maps the DEX names in dexespools.json to the corresponding DexType enum indices in DexAggregator.sol
+const DEX_NAME_TO_INDEX = {
+  // Main DEXes
+  'uniswap_v2': 0,                  // UniswapV2
+  'uniswap_v3': 1,                  // UniswapV3
+  'sushiswap': 2,                   // SushiSwapV2
+  'sushiswap-v3-ethereum': 2,       // Also use SushiSwapV2 (or could be different if needed)
+  'uniswap-v4-ethereum': 3,         // UniswapV4
+  'pancakeswap_ethereum': 4,        // PancakeSwapV2
+  'pancakeswap-v3-ethereum': 5,     // PancakeSwapV3
+  'balancer_ethereum': 6,           // Balancer
+  'curve': 7,                       // Curve
+  'solidlydex': 8,                  // Solidly
+  'kyberswap_classic_ethereum': 9,  // KyberClassic
+  'kyberswap_elastic': 10,          // KyberElastic
+  
+  // Additional DEXes
+  'shibaswap': 12,                  // Shibaswap
+  'sakeswap': 13,                   // Sakeswap
+  'ethervista': 14,                 // Ethervista
+  'x7-finance-ethereum': 15,        // X7Finance
+  'x7-finance': 15,                 // X7Finance (alternate name)
+  'hopeswap': 16,                   // Hopeswap
+  'defi_swap': 17,                  // Defiswap
+  'saitaswap-ethereum': 18,         // Saitaswap
+  'radioshack_ethereum': 19,        // Radioshack
+  'verse': 20,                      // Verse
+  'fraxswap_ethereum': 21,          // Fraxswap
+  'smardex-ethereum': 22,           // Smardex
+  'elk_finance_ethereum': 23,       // Elkfinance
+  'swapr_ethereum': 24,             // Swapr
+  'apeswap_ethereum': 25,           // Apeswap
+  'antfarm-ethereum': 26,           // Antfarm
+  
+  // You might need to add more mappings for other DEXes in your JSON
+  'unicly': 0,                      // Fallback to UniswapV2 interface
+  'standard_ethereum': 0,           // Fallback to UniswapV2 interface
+  'justmoney-ethereum': 0           // Fallback to UniswapV2 interface
+};
+
 // Función para actualizar datos de liquidez antes de ejecutar el arbitraje
 async function updateLiquidityData() {
   if (UPDATE_LIQUIDITY_DATA) {
@@ -563,9 +604,9 @@ async function findArbitrageOpportunities(prices: TokenPrice[]): Promise<Arbitra
             baseTokenSymbol: buyPrice.baseTokenSymbol,
             quoteTokenAddress: buyPrice.quoteToken,
             quoteTokenSymbol: buyPrice.quoteTokenSymbol,
-            buyDex: buyPrice.dex,
-            sellDex: sellPrice.dex,
-            buyDexType: buyPrice.dexType,
+            buyDex: buyPrice.dex, // Store the actual DEX name, not just index
+            sellDex: sellPrice.dex, // Store the actual DEX name, not just index
+            buyDexType: buyPrice.dexType, 
             sellDexType: sellPrice.dexType,
             buyPrice: buyPrice.price,
             sellPrice: sellPrice.price,
@@ -636,6 +677,16 @@ async function executeFlashLoan(opportunity: ArbitrageOpportunity): Promise<bool
     return false;
   }
   
+  // Map DEX names to contract indices using our mapping
+  const buyDexIndex = DEX_NAME_TO_INDEX[opportunity.buyDex];
+  const sellDexIndex = DEX_NAME_TO_INDEX[opportunity.sellDex];
+  
+  // Validate DEX indices before proceeding
+  if (buyDexIndex === undefined || sellDexIndex === undefined) {
+    console.log(`⚠️ Could not map DEX name to index: ${opportunity.buyDex} or ${opportunity.sellDex}`);
+    return false;
+  }
+  
   try {
     // Obtener balance inicial de ETH
     const initialEthBalance = await wallet.getBalance();
@@ -659,8 +710,8 @@ async function executeFlashLoan(opportunity: ArbitrageOpportunity): Promise<bool
 
     console.log(`\n🚀 EJECUTANDO ARBITRAJE DE PRÉSTAMO FLASH:`);
     console.log(`   Par de tokens: ${opportunity.baseTokenSymbol}/${opportunity.quoteTokenSymbol}`);
-    console.log(`   Comprar en ${DEX_INFO[opportunity.buyDex]?.name} a ${opportunity.buyPrice}`);
-    console.log(`   Vender en ${DEX_INFO[opportunity.sellDex]?.name} a ${opportunity.sellPrice}`);
+    console.log(`   Comprar en ${DEX_INFO[opportunity.buyDex]?.name} (index: ${buyDexIndex}) a ${opportunity.buyPrice}`);
+    console.log(`   Vender en ${DEX_INFO[opportunity.sellDex]?.name} (index: ${sellDexIndex}) a ${opportunity.sellPrice}`);
     console.log(`   Beneficio neto esperado: $${opportunity.netProfitUSD.toFixed(2)}`);
     
     // Verificar precio de gas
