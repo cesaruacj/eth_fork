@@ -2,11 +2,22 @@ import { ethers } from "hardhat";
 import { DEX_ROUTERS, FACTORIES, AAVE_V3 } from "../config/addresses";
 import fs from "fs";
 import path from "path";
+import { execSync } from 'child_process'; // Añadir esta importación
 
 const ADDRESSES_PATH = path.resolve(__dirname, "../config/addresses.ts");
 const GAS_FEE_PATH = path.resolve(__dirname, "../data/gasFee.json");
 
 async function main() {
+    // Ejecutar gasFee.ts para actualizar los datos de gas antes del despliegue
+    console.log("🔄 Actualizando información de gas...");
+    try {
+        // Ejecuta gasFee.ts y muestra su salida en la consola
+        execSync('npx hardhat run scripts/gasFee.ts --network localhost', { stdio: 'inherit' });
+        console.log("✅ Información de gas actualizada correctamente");
+    } catch (error) {
+        console.warn("⚠️ Error al actualizar información de gas, se usarán valores predeterminados");
+    }
+    
     // Obtener cuentas y configurar deployer
     const [deployer] = await ethers.getSigners();
     console.log("🔑 Desplegando contratos con la cuenta:", deployer.address);

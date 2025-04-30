@@ -7,7 +7,7 @@ dotenv.config();
 // Configuración
 const DATA_FILE_PATH = path.join(__dirname, "../data/gasFee.json");
 const MAX_HISTORY_ENTRIES = 100; // Número máximo de entradas históricas
-const UPDATE_INTERVAL_MS = 0.01 * 60 * 1000; // milisegundos (0 para una sola ejecución)
+const UPDATE_INTERVAL_MS = 0 * 60 * 1000; // milisegundos (0 para una sola ejecución)
 
 // Inicializar proveedor
 if (!process.env.RPC_URL) {

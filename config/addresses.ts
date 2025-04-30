@@ -88,9 +88,9 @@ export const DEX_ROUTERS = {
 
 // Deployed Contracts
 export const DEPLOYED_CONTRACTS = {
-  // Automatically updated by deploy script on 4/29/2025, 8:52:43 PM
-  DEX_AGGREGATOR: "0x4B7099FD879435a087C364aD2f9E7B3f94d20bBe",
-  FLASH_LOAN_ARBITRAGE: "0x99aA73dA6309b8eC484eF2C95e96C131C1BBF7a0"
+  // Automatically updated by deploy script on 4/29/2025, 8:56:48 PM
+  DEX_AGGREGATOR: "0xfDD930c22708c7572278cf74D64f3721Eedc18Ad",
+  FLASH_LOAN_ARBITRAGE: "0x757Fd23a0fDF9F9d2786f62f96f02Db4D096d10A"
 }
 
 // Aave V3 System Contracts
