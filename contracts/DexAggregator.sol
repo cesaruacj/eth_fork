@@ -994,6 +994,11 @@ contract DexAggregator {
         IERC20(token).safeTransfer(to, amount);
     }
     
+    function transferOwnership(address newOwner) external onlyOwner {
+        require(newOwner != address(0), "New owner is the zero address");
+        owner = newOwner;
+    }
+    
     // For receiving ETH
     receive() external payable {}
 }
