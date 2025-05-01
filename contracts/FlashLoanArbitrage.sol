@@ -43,6 +43,9 @@ contract FlashLoanArbitrage is Ownable, ReentrancyGuard, IFlashLoanSimpleReceive
         uint256 profit
     );
 
+    /// @notice Lista de tokens intermediarios para arbitraje
+    address[] public intermediaryTokens;
+
     /**
      * @dev Constructor initializes the contract with Aave provider and DexAggregator
      * @param provider Aave PoolAddressesProvider address
@@ -157,44 +160,71 @@ contract FlashLoanArbitrage is Ownable, ReentrancyGuard, IFlashLoanSimpleReceive
         uint256 amountIn,
         uint256 amountOwing
     ) internal returns (uint256 receivedAmount, uint256 profit) {
-        // Registrar saldo inicial para cálculo preciso del beneficio
-        uint256 initialBalance = IERC20(tokenIn).balanceOf(address(this));
+        require(intermediaryTokens.length > 0, "No intermediary tokens configured");
         
-        // 1. Obtener mejor cotización
-        (uint256 bestAmountOut, uint256 bestDexIndex) = dexAggregator
-            .getBestDexQuote(tokenIn, tokenIn, amountIn);
-
-        // 2. Verificar rentabilidad (si no estamos en modo test)
-        if (!testMode) {
-            // Calcular salida mínima esperada con 0.5% de buffer para slippage
-            uint256 minExpectedOutput = amountOwing + (amountOwing * 5 / 1000);
+        uint256 initialBalance = IERC20(tokenIn).balanceOf(address(this));
+        uint256 bestReceivedAmount = 0;
+        address bestIntermediaryToken;
+        uint256 bestFirstDexIndex;
+        uint256 bestSecondDexIndex;
+        uint256 bestMidAmountOut;
+        
+        // Find the most profitable path across all intermediary tokens
+        for (uint256 i = 0; i < intermediaryTokens.length; i++) {
+            address intermediaryToken = intermediaryTokens[i];
             
-            require(
-                bestAmountOut >= minExpectedOutput,
-                "Opportunity not profitable"
+            // Skip if intermediaryToken is the same as tokenIn
+            if (intermediaryToken == tokenIn) continue;
+            
+            // Get quotes for this path
+            (uint256 midAmountOut, uint256 firstDexIndex) = dexAggregator
+                .getBestDexQuote(tokenIn, intermediaryToken, amountIn);
+                
+            if (midAmountOut == 0) continue; // Skip if no liquidity
+                
+            (uint256 finalAmountOut, uint256 secondDexIndex) = dexAggregator
+                .getBestDexQuote(intermediaryToken, tokenIn, midAmountOut);
+                
+            if (finalAmountOut > bestReceivedAmount) {
+                bestReceivedAmount = finalAmountOut;
+                bestIntermediaryToken = intermediaryToken;
+                bestFirstDexIndex = firstDexIndex;
+                bestSecondDexIndex = secondDexIndex;
+                bestMidAmountOut = midAmountOut;
+            }
+        }
+        
+        // Execute the best path if profitable
+        if (bestReceivedAmount > amountIn) {
+            // Execute first swap
+            IERC20(tokenIn).safeApprove(address(dexAggregator), 0);
+            IERC20(tokenIn).safeApprove(address(dexAggregator), amountIn);
+            
+            uint256 midAmount = dexAggregator.swapOnDex(
+                bestFirstDexIndex,
+                tokenIn,
+                bestIntermediaryToken,
+                amountIn,
+                (bestMidAmountOut * 995) / 1000 // 0.5% slippage
+            );
+            
+            // Execute second swap
+            IERC20(bestIntermediaryToken).safeApprove(address(dexAggregator), 0);
+            IERC20(bestIntermediaryToken).safeApprove(address(dexAggregator), midAmount);
+            
+            receivedAmount = dexAggregator.swapOnDex(
+                bestSecondDexIndex,
+                bestIntermediaryToken,
+                tokenIn,
+                midAmount,
+                (bestReceivedAmount * 995) / 1000 // 0.5% slippage
             );
         }
-
-        // 3. Ejecutar swap con 0.5% de tolerancia al slippage
-        uint256 minAmountOut = (bestAmountOut * 995) / 1000;
         
-        // Restablecer aprobación antes de swapear
-        IERC20(tokenIn).safeApprove(address(dexAggregator), 0);
-        IERC20(tokenIn).safeApprove(address(dexAggregator), amountIn);
-        
-        receivedAmount = dexAggregator.swapOnDex(
-            bestDexIndex,
-            tokenIn,
-            tokenIn,
-            amountIn,
-            minAmountOut
-        );
-
-        // 4. Calcular ganancia neta (tras devolver amountOwing) de forma más precisa
+        // Calculate profit
         uint256 finalBalance = IERC20(tokenIn).balanceOf(address(this));
         uint256 netGain = 0;
         
-        // Calcular ganancia neta, teniendo en cuenta el saldo inicial
         if (finalBalance > initialBalance) {
             netGain = finalBalance - initialBalance;
         }
@@ -253,6 +283,50 @@ contract FlashLoanArbitrage is Ownable, ReentrancyGuard, IFlashLoanSimpleReceive
         dexAggregator.addDex(DexAggregator.DexType.Solidly, 0x77784f96C936042A3ADB1dD29C91a55EB2A4219f, address(0));
         dexAggregator.addDex(DexAggregator.DexType.Verse, 0xB4B0ea46Fe0E9e8EAB4aFb765b527739F2718671, address(0));
         dexAggregator.addDex(DexAggregator.DexType.X7Finance, 0x6b5422D584943BC8Cd0E10e239d624c6fE90fbB8, address(0));
+    }
+
+    /**
+     * @notice Setup intermediary tokens for arbitrage
+     */
+    function setupIntermediaryTokens() external onlyOwner {
+        // Clear existing tokens
+        delete intermediaryTokens;
+        
+        // Add major AAVE tokens (most liquid ones first for gas efficiency)
+        intermediaryTokens.push(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2); // WETH
+        intermediaryTokens.push(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48); // USDC
+        intermediaryTokens.push(0x6B175474E89094C44Da98b954EedeAC495271d0F); // DAI
+        intermediaryTokens.push(0xdAC17F958D2ee523a2206206994597C13D831ec7); // USDT
+        intermediaryTokens.push(0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599); // WBTC
+        intermediaryTokens.push(0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9); // AAVE
+        intermediaryTokens.push(0x514910771AF9Ca656af840dff83E8264EcF986CA); // LINK
+        intermediaryTokens.push(0xBe9895146f7AF43049ca1c1AE358B0541Ea49704); // cbETH
+        intermediaryTokens.push(0x5f98805A4E8be255a32880FDeC7F6728C6568bA0); // LUSD
+        intermediaryTokens.push(0xD533a949740bb3306d119CC777fa900bA034cd52); // CRV
+        intermediaryTokens.push(0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2); // MKR
+        intermediaryTokens.push(0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F); // SNX
+        intermediaryTokens.push(0xba100000625a3754423978a60c9317c58a424e3D); // BAL
+        intermediaryTokens.push(0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984); // UNI
+        intermediaryTokens.push(0x5A98FcBEA516Cf06857215779Fd812CA3beF1B32); // LDO
+        intermediaryTokens.push(0xC18360217D8F7Ab5e7c516566761Ea12Ce7F9D72); // ENS
+        intermediaryTokens.push(0x111111111117dC0aa78b770fA6A738034120C302); // 1INCH
+        intermediaryTokens.push(0x853d955aCEf822Db058eb8505911ED77F175b99e); // FRAX
+        intermediaryTokens.push(0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f); // GHO
+        intermediaryTokens.push(0xD33526068D116cE69F19A9ee46F0bd304F21A51f); // RPL
+        intermediaryTokens.push(0x83F20F44975D03b1b09e64809B757c47f942BEeA); // sDAI
+        intermediaryTokens.push(0xAf5191B0De278C7286d6C7CC6ab6BB8A73bA2Cd6); // STG
+        intermediaryTokens.push(0x29483d288845Aa883693cFF207cD02B828B6177C); // KNC
+        intermediaryTokens.push(0x3432B6A60D23Ca0dFCa7761B7ab56459D9C964D0); // FXS
+        intermediaryTokens.push(0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E); // crvUSD
+        intermediaryTokens.push(0x6c3ea9036406852006290770BEdFcAbA0e23A0e8); // PYUSD
+        intermediaryTokens.push(0xCd5fE23C85820F7B72D0926FC9b05b43E359b7ee); // weETH
+        intermediaryTokens.push(0xf1C9acDc66974dFB6dEcB12aA385b9cD01190E38); // osETH
+        intermediaryTokens.push(0x9D39A5DE30e57443BfF2A8307A4256c8797A3497); // sUSDe
+        intermediaryTokens.push(0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf); // cbBTC
+        intermediaryTokens.push(0xdC035D45d973E3EC169d2276DDab16f1e407384F); // USDS
+        intermediaryTokens.push(0xA1290d69c65A6Fe4DF752f95823fae25cB99e5A7); // rsETH
+        intermediaryTokens.push(0x8236a87084f8B84306f72007F36F2618A5634494); // LBTC
+
     }
 
     // Fix this function to handle payable address

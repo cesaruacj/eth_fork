@@ -74,7 +74,19 @@ async function main() {
 }`;
     fs.writeFileSync(ADDRESSES_PATH, addressesFile.replace(/export const DEPLOYED_CONTRACTS = {[^}]+}/m, newContracts), "utf8");
 
-    console.log("✨ Despliegue completado. Ejecuta: npx hardhat run scripts/arbitrage.ts --network localhost");
+    console.log("✨ Despliegue completado");
+}
+
+//Ejecutar setup-dexes.ts para inicializar DEXes
+console.log("🔄 Inicializando DEXes en FlashLoanArbitrage...");
+try {
+    execSync('npx hardhat run scripts/setup-dexes.ts --network localhost', { 
+        stdio: 'inherit', 
+        encoding: 'utf-8'
+    });
+    console.log("✅ DEXes inicializados correctamente");
+} catch (error) {
+    console.warn("⚠️ No se pudieron inicializar dexes:", error);
 }
 
 main().catch((error) => {

@@ -250,9 +250,9 @@ contract DexAggregator {
         Curve,        // 8
         MaverickV2,   // 9
         // Additional DEXes
-        Antfarm      // 10
+        Antfarm,      // 10
         Apeswap,     // 11
-        DefiSwap,    // 12
+        Defiswap,    // 12
         Elkfinance,  // 13
         Ethervista,  // 14
         Fraxswap,   // 15
@@ -267,7 +267,7 @@ contract DexAggregator {
         Solidly,      // 24
         Swapr,        // 25
         Verse,       // 26
-        X7Finance,   // 27
+        X7Finance  // 27
 
     }
 
@@ -321,29 +321,29 @@ contract DexAggregator {
         isV2Like[DexType.UniswapV2] = true;
         isV2Like[DexType.SushiSwapV2] = true;
         isV2Like[DexType.PancakeSwapV2] = true;
-        isV2Like[DexType.Sakeswap] = true;
-        isV2Like[DexType.Ethervista] = true;
-        isV2Like[DexType.X7Finance] = true;
-        isV2Like[DexType.Hopeswap] = true;
-        isV2Like[DexType.Defiswap] = true;
-        isV2Like[DexType.Saitaswap] = true;
-        isV2Like[DexType.Radioshack] = true;
-        isV2Like[DexType.Verse] = true;
-        isV2Like[DexType.Fraxswap] = true;
-        isV2Like[DexType.Smardex] = true;
-        isV2Like[DexType.Elkfinance] = true;
-        isV2Like[DexType.Swapr] = true;
-        isV2Like[DexType.Apeswap] = true;
         isV2Like[DexType.Antfarm] = true;
+        isV2Like[DexType.Apeswap] = true;
+        isV2Like[DexType.Defiswap] = true;
+        isV2Like[DexType.Fraxswap] = true;
+        isV2Like[DexType.Elkfinance] = true;
+        isV2Like[DexType.Ethervista] = true;
+        isV2Like[DexType.Hopeswap] = true;
+        isV2Like[DexType.Radioshack] = true;
+        isV2Like[DexType.Saitaswap] = true;
+        isV2Like[DexType.Sakeswap] = true;
+        isV2Like[DexType.Smardex] = true;
         isV2Like[DexType.Solidly] = true;
+        isV2Like[DexType.Swapr] = true;
+        isV2Like[DexType.Verse] = true;
+        isV2Like[DexType.X7Finance] = true;
 
         // V3-like interfaces
         isV3Like[DexType.UniswapV3] = true;
         isV3Like[DexType.UniswapV4] = true;
         isV3Like[DexType.SushiSwapV3] = true;
-        isV3Like[DexType.Shibaswap] = true;
         isV3Like[DexType.PancakeSwapV3] = true;
         isV3Like[DexType.KyberElastic] = true;
+        isV3Like[DexType.Shibaswap] = true;
     }
 
     function addDex(DexType _dexType, address _router, address _quoter) external onlyOwner {

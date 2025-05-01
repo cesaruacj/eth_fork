@@ -24,7 +24,7 @@ async function main() {
   try {
     // Setup DEXes
     const tx = await flashLoanArbitrage.setupAllDexes({
-      gasLimit: 5000000
+      gasLimit: 9000000
     });
     
     console.log("⏳ Transaction sent:", tx.hash);
