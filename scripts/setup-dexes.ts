@@ -24,12 +24,28 @@ async function main() {
   try {
     // Setup DEXes
     const tx = await flashLoanArbitrage.setupAllDexes({
-      gasLimit: 9000000
+      gasLimit: 5000000
     });
     
     console.log("⏳ Transaction sent:", tx.hash);
     await tx.wait();
     console.log("✅ DEXes successfully initialized");
+
+    // Después de ejecutar setupAllDexes, añade esto:
+    console.log("Verificando DEXes configurados...");
+    const dexAggregator = await ethers.getContractAt(
+      "DexAggregator", 
+      DEPLOYED_CONTRACTS.DEX_AGGREGATOR,
+      deployer
+    );
+
+    for (let i = 0; i < 28; i++) {
+      try {
+        console.log(`DEX ${i}: ${await dexAggregator.getDexName(i)}`);
+      } catch (e) {
+        console.log(`DEX ${i}: no configurado o error`);
+      }
+    }
   } catch (error) {
     console.error("❌ Failed to initialize DEXes:", error.message);
     process.exitCode = 1;

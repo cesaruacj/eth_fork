@@ -241,32 +241,34 @@ contract DexAggregator {
     enum DexType { 
         UniswapV2,    // 0
         UniswapV3,    // 1
-        SushiSwapV2,  // 2
-        UniswapV4,    // 3
-        PancakeSwapV2,// 4
-        PancakeSwapV3,// 5
-        Balancer,     // 6
-        Curve,        // 7
-        Solidly,      // 8
-        KyberClassic, // 9
-        KyberElastic, // 10
-        MaverickV2,   // 11
-        // Additional DEXes using UniswapV2 interface
-        Shibaswap,    // 12
-        Sakeswap,     // 13
-        Ethervista,   // 14
-        X7Finance,    // 15
-        Hopeswap,     // 16
-        Defiswap,     // 17
-        Saitaswap,    // 18
-        Radioshack,   // 19
-        Verse,        // 20
-        Fraxswap,     // 21
-        Smardex,      // 22
-        Elkfinance,   // 23
-        Swapr,        // 24
-        Apeswap,      // 25
-        Antfarm       // 26
+        UniswapV4,    // 2
+        SushiSwapV2,  // 3
+        SushiSwapV3,  // 4
+        PancakeSwapV2,// 5
+        PancakeSwapV3,// 6
+        Balancer,     // 7
+        Curve,        // 8
+        MaverickV2,   // 9
+        // Additional DEXes
+        Antfarm      // 10
+        Apeswap,     // 11
+        DefiSwap,    // 12
+        Elkfinance,  // 13
+        Ethervista,  // 14
+        Fraxswap,   // 15
+        Hopeswap,   // 16
+        KyberClassic, // 17
+        KyberElastic, // 18
+        Radioshack,  // 19
+        Saitaswap,   // 20
+        Sakeswap,     // 21
+        Shibaswap,    // 22
+        Smardex,      // 23
+        Solidly,      // 24
+        Swapr,        // 25
+        Verse,       // 26
+        X7Finance,   // 27
+
     }
 
     struct DexInfo {
@@ -319,7 +321,6 @@ contract DexAggregator {
         isV2Like[DexType.UniswapV2] = true;
         isV2Like[DexType.SushiSwapV2] = true;
         isV2Like[DexType.PancakeSwapV2] = true;
-        isV2Like[DexType.Shibaswap] = true;
         isV2Like[DexType.Sakeswap] = true;
         isV2Like[DexType.Ethervista] = true;
         isV2Like[DexType.X7Finance] = true;
@@ -338,6 +339,9 @@ contract DexAggregator {
 
         // V3-like interfaces
         isV3Like[DexType.UniswapV3] = true;
+        isV3Like[DexType.UniswapV4] = true;
+        isV3Like[DexType.SushiSwapV3] = true;
+        isV3Like[DexType.Shibaswap] = true;
         isV3Like[DexType.PancakeSwapV3] = true;
         isV3Like[DexType.KyberElastic] = true;
     }
@@ -434,6 +438,21 @@ contract DexAggregator {
         // V3-like DEXes require an off-chain quoter, return 0 here
         // as quotes can't be reliably obtained in view functions
         return 0;
+    }
+
+    /**
+     * @dev Gets the price of one token in terms of another from a specific DEX
+     */
+    function getTokenPrice(
+        address token1,
+        address token2,
+        uint8 dexType
+    ) external view returns (uint256) {
+        require(uint256(dexType) < dexes.length, "Invalid DEX type");
+        require(dexes[dexType].active, "DEX not active");
+        
+        // Use existing getQuoteFromDex with 1 token as input amount (10^18 wei)
+        return getQuoteFromDex(dexType, token1, token2, 10**18);
     }
 
     /**
@@ -997,6 +1016,48 @@ contract DexAggregator {
     function transferOwnership(address newOwner) external onlyOwner {
         require(newOwner != address(0), "New owner is the zero address");
         owner = newOwner;
+    }
+    
+    /**
+     * @dev Returns the name of a DEX based on its type index
+     * @param dexType The index of the DEX type
+     * @return The name of the DEX
+     */
+    function getDexName(uint8 dexType) external view returns (string memory) {
+        require(uint256(dexType) < 27, "Invalid DEX type");
+        
+        if (dexType == uint8(DexType.UniswapV2)) return "UniswapV2"; // 0
+        if (dexType == uint8(DexType.UniswapV3)) return "UniswapV3"; // 1
+        if (dexType == uint8(DexType.UniswapV4)) return "UniswapV4"; // 2
+        if (dexType == uint8(DexType.SushiSwapV2)) return "SushiSwapV2"; // 3
+        if (dexType == uint8(DexType.SushiSwapV3)) return "SushiSwapV3"; // 4
+        if (dexType == uint8(DexType.PancakeSwapV2)) return "PancakeSwapV2"; // 5
+        if (dexType == uint8(DexType.PancakeSwapV3)) return "PancakeSwapV3"; // 6
+        if (dexType == uint8(DexType.Balancer)) return "Balancer"; // 7
+        if (dexType == uint8(DexType.Curve)) return "Curve"; // 8
+        if (dexType == uint8(DexType.MaverickV2)) return "MaverickV2"; // 9
+        // Other dexes
+        if (dexType == uint8(DexType.Antfarm)) return "Antfarm"; // 10
+        if (dexType == uint8(DexType.Apeswap)) return "Apeswap"; // 11
+        if (dexType == uint8(DexType.Defiswap)) return "Defiswap"; // 12
+        if (dexType == uint8(DexType.Elkfinance)) return "Elkfinance"; // 13
+        if (dexType == uint8(DexType.Ethervista)) return "Ethervista"; // 14
+        if (dexType == uint8(DexType.Fraxswap)) return "Fraxswap"; // 15
+        if (dexType == uint8(DexType.Hopeswap)) return "Hopeswap"; // 16
+        if (dexType == uint8(DexType.KyberClassic)) return "KyberClassic"; // 17
+        if (dexType == uint8(DexType.KyberElastic)) return "KyberElastic"; // 18
+        if (dexType == uint8(DexType.Radioshack)) return "Radioshack"; // 19
+        if (dexType == uint8(DexType.Saitaswap)) return "Saitaswap"; // 20
+        if (dexType == uint8(DexType.Sakeswap)) return "Sakeswap"; // 21
+        if (dexType == uint8(DexType.Shibaswap)) return "Shibaswap"; // 22
+        if (dexType == uint8(DexType.Smardex)) return "Smardex"; // 23
+        if (dexType == uint8(DexType.Solidly)) return "Solidly"; // 24
+        if (dexType == uint8(DexType.Swapr)) return "Swapr"; // 25
+        if (dexType == uint8(DexType.Verse)) return "Verse"; // 26
+        if (dexType == uint8(DexType.X7Finance)) return "X7Finance"; // 27
+
+        // Default case if no match found
+        return "Unknown";
     }
     
     // For receiving ETH

@@ -22,39 +22,37 @@ const DEX_NAME_TO_INDEX = {
   // Main DEXes
   'uniswap_v2': 0,                  // UniswapV2
   'uniswap_v3': 1,                  // UniswapV3
-  'sushiswap': 2,                   // SushiSwapV2
-  'sushiswap-v3-ethereum': 2,       // Also use SushiSwapV2 (or could be different if needed)
-  'uniswap-v4-ethereum': 3,         // UniswapV4
-  'pancakeswap_ethereum': 4,        // PancakeSwapV2
-  'pancakeswap-v3-ethereum': 5,     // PancakeSwapV3
-  'balancer_ethereum': 6,           // Balancer
-  'curve': 7,                       // Curve
-  'solidlydex': 8,                  // Solidly
-  'kyberswap_classic_ethereum': 9,  // KyberClassic
-  'kyberswap_elastic': 10,          // KyberElastic
-  
+  'uniswap-v4-ethereum': 2,         // UniswapV4
+  'sushiswap': 3,                   // SushiSwapV2
+  'sushiswap-v3-ethereum': 4,       // Also use SushiSwapV2 (or could be different if needed)
+  'pancakeswap_ethereum': 5,        // PancakeSwapV2
+  'pancakeswap-v3-ethereum': 6,     // PancakeSwapV3
+
+  // Other Major DEXes
+  'balancer_ethereum': 7,           // Balancer
+  'curve': 8,                       // Curve
+  'maverick_ethereum': 9,          // MaverickV2
+
   // Additional DEXes
-  'shibaswap': 12,                  // Shibaswap
-  'sakeswap': 13,                   // Sakeswap
+  'antfarm-ethereum': 10,           // Antfarm
+  'apeswap_ethereum': 11,           // Apeswap
+  'defi_swap': 12,                  // Defiswap
+  'elk_finance_ethereum': 13,       // Elkfinance
   'ethervista': 14,                 // Ethervista
-  'x7-finance-ethereum': 15,        // X7Finance
-  'x7-finance': 15,                 // X7Finance (alternate name)
+  'fraxswap_ethereum': 15,          // Fraxswap
   'hopeswap': 16,                   // Hopeswap
-  'defi_swap': 17,                  // Defiswap
-  'saitaswap-ethereum': 18,         // Saitaswap
+  'kyberswap_classic_ethereum': 17,  // KyberClassic
+  'kyberswap_elastic': 18,          // KyberElastic
   'radioshack_ethereum': 19,        // Radioshack
-  'verse': 20,                      // Verse
-  'fraxswap_ethereum': 21,          // Fraxswap
-  'smardex-ethereum': 22,           // Smardex
-  'elk_finance_ethereum': 23,       // Elkfinance
-  'swapr_ethereum': 24,             // Swapr
-  'apeswap_ethereum': 25,           // Apeswap
-  'antfarm-ethereum': 26,           // Antfarm
-  
-  // You might need to add more mappings for other DEXes in your JSON
-  'unicly': 0,                      // Fallback to UniswapV2 interface
-  'standard_ethereum': 0,           // Fallback to UniswapV2 interface
-  'justmoney-ethereum': 0           // Fallback to UniswapV2 interface
+  'saitaswap-ethereum': 20,         // Saitaswap
+  'sakeswap': 21,                   // Sakeswap
+  'shibaswap': 22,                  // Shibaswap
+  'smardex-ethereum': 23,           // Smardex
+  'solidlydex': 24,                  // Solidly
+  'swapr_ethereum': 25,             // Swapr
+  'verse': 26,                      // Verse
+  'x7-finance-ethereum': 27,        // X7Finance
+
 };
 
 // Función para actualizar datos de liquidez antes de ejecutar el arbitraje

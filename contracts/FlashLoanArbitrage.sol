@@ -216,54 +216,43 @@ contract FlashLoanArbitrage is Ownable, ReentrancyGuard, IFlashLoanSimpleReceive
         
         // UniswapV2
         dexAggregator.addDex(DexAggregator.DexType.UniswapV2, 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D, address(0));
-        
         // UniswapV3
         dexAggregator.addDex(DexAggregator.DexType.UniswapV3, 0xE592427A0AEce92De3Edee1F18E0157C05861564, 0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6);
-        
-        // SushiSwapV2
-        dexAggregator.addDex(DexAggregator.DexType.SushiSwapV2, 0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F, address(0));
-        
         // UniswapV4
         dexAggregator.addDex(DexAggregator.DexType.UniswapV4, 0x66a9893cC07D91D95644AEDD05D03f95e1dBA8Af, 0x52F0E24D1c21C8A0cB1e5a5dD6198556BD9E1203);
-        
+        // SushiSwapV2
+        dexAggregator.addDex(DexAggregator.DexType.SushiSwapV2, 0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F, address(0));
+        // SushiSwapV3
+        dexAggregator.addDex(DexAggregator.DexType.SushiSwapV3, 0x2E6cd2d30aa43f40aa81619ff4b6E0a41479B13F, address(0));
         // PancakeSwapV2
         dexAggregator.addDex(DexAggregator.DexType.PancakeSwapV2, 0xEfF92A263d31888d860bD50809A8D171709b7b1c, address(0));
-        
         // PancakeSwapV3
         dexAggregator.addDex(DexAggregator.DexType.PancakeSwapV3, 0x1b81D678ffb9C0263b24A97847620C99d213eB14, 0xB048Bbc1Ee6b733FFfCFb9e9CeF7375518e25997);
-        
         // Balancer
         dexAggregator.addDex(DexAggregator.DexType.Balancer, 0xbA1333333333a1BA1108E8412f11850A5C319bA9, address(0));
-        
         // Curve
         dexAggregator.addDex(DexAggregator.DexType.Curve, 0x16C6521Dff6baB339122a0FE25a9116693265353, address(0));
-        
-        // KyberClassic - Fixed checksum
-        dexAggregator.addDex(DexAggregator.DexType.KyberClassic, 0x51E8D106C646cA58Caf32A47812e95887C071a62, address(0));
-        
-        // KyberElastic - Fixed checksum
-        dexAggregator.addDex(DexAggregator.DexType.KyberElastic, 0xF9c2b5746c946EF883ab2660BbbB1f10A5bdeAb4, address(0));
-        
-        // Additional DEXes using UniswapV2 interface
-        dexAggregator.addDex(DexAggregator.DexType.Shibaswap, 0x03f7724180AA6b939894B5Ca4314783B0b36b329, address(0));
-        dexAggregator.addDex(DexAggregator.DexType.Sakeswap, 0x9C578b573EdE001b95d51a55A3FAfb45f5608b1f, address(0));
-        dexAggregator.addDex(DexAggregator.DexType.Ethervista, 0xCEDd366065A146a039B92Db35756ecD7688FCC77, address(0));
-        dexAggregator.addDex(DexAggregator.DexType.X7Finance, 0x6b5422D584943BC8Cd0E10e239d624c6fE90fbB8, address(0));
-        dexAggregator.addDex(DexAggregator.DexType.Hopeswap, 0x219Bd2d1449F3813c01204EE455D11B41D5051e9, address(0));
-        dexAggregator.addDex(DexAggregator.DexType.Defiswap, 0xCeB90E4C17d626BE0fACd78b79c9c87d7ca181b3, address(0));
-        dexAggregator.addDex(DexAggregator.DexType.Saitaswap, 0x549EFb3c8365F3f222aaA44D9af7894CdAfFF083, address(0));
-        dexAggregator.addDex(DexAggregator.DexType.Radioshack, 0x3e445e3280C5747a188DB8d0aB7762838A50E4ff, address(0));
-        dexAggregator.addDex(DexAggregator.DexType.Verse, 0xB4B0ea46Fe0E9e8EAB4aFb765b527739F2718671, address(0));
-        dexAggregator.addDex(DexAggregator.DexType.Fraxswap, 0xC14d550632db8592D1243Edc8B95b0Ad06703867, address(0));
-        dexAggregator.addDex(DexAggregator.DexType.Smardex, 0xC33984ABcAe20f47a754eF78f6526FeF266c0C6F, address(0));
-        dexAggregator.addDex(DexAggregator.DexType.Elkfinance, 0xb5e9F6C58f548CeE53257304e287b23757eFFCA1, address(0));
-        dexAggregator.addDex(DexAggregator.DexType.Swapr, 0xB9960d9bcA016e9748bE75dd52F02188B9d0829f, address(0));
-        dexAggregator.addDex(DexAggregator.DexType.Apeswap, 0x5f509a3C3F16dF2Fba7bF84dEE1eFbce6BB85587, address(0));
-        dexAggregator.addDex(DexAggregator.DexType.Antfarm, 0x6D9f0eb21D77C6d24bE49a579508471E937D5418, address(0));
-        dexAggregator.addDex(DexAggregator.DexType.Solidly, 0x77784f96C936042A3ADB1dD29C91a55EB2A4219f, address(0));
-        
         // MaverickV2
         dexAggregator.addDex(DexAggregator.DexType.MaverickV2, 0x62e31802c6145A2D5E842EeD8efe01fC224422fA, 0xb40AfdB85a07f37aE217E7D6462e609900dD8D7A);
+        // Additional DEXes using UniswapV2 interface
+        dexAggregator.addDex(DexAggregator.DexType.Antfarm, 0x6D9f0eb21D77C6d24bE49a579508471E937D5418, address(0));
+        dexAggregator.addDex(DexAggregator.DexType.Apeswap, 0x5f509a3C3F16dF2Fba7bF84dEE1eFbce6BB85587, address(0));
+        dexAggregator.addDex(DexAggregator.DexType.Defiswap, 0xCeB90E4C17d626BE0fACd78b79c9c87d7ca181b3, address(0));
+        dexAggregator.addDex(DexAggregator.DexType.Elkfinance, 0xb5e9F6C58f548CeE53257304e287b23757eFFCA1, address(0));
+        dexAggregator.addDex(DexAggregator.DexType.Ethervista, 0xCEDd366065A146a039B92Db35756ecD7688FCC77, address(0));
+        dexAggregator.addDex(DexAggregator.DexType.Fraxswap, 0xC14d550632db8592D1243Edc8B95b0Ad06703867, address(0));
+        dexAggregator.addDex(DexAggregator.DexType.Hopeswap, 0x219Bd2d1449F3813c01204EE455D11B41D5051e9, address(0));
+        dexAggregator.addDex(DexAggregator.DexType.KyberClassic, 0x51E8D106C646cA58Caf32A47812e95887C071a62, address(0));
+        dexAggregator.addDex(DexAggregator.DexType.KyberElastic, 0xF9c2b5746c946EF883ab2660BbbB1f10A5bdeAb4, address(0));
+        dexAggregator.addDex(DexAggregator.DexType.Radioshack, 0x3e445e3280C5747a188DB8d0aB7762838A50E4ff, address(0));
+        dexAggregator.addDex(DexAggregator.DexType.Saitaswap, 0x549EFb3c8365F3f222aaA44D9af7894CdAfFF083, address(0));
+        dexAggregator.addDex(DexAggregator.DexType.Sakeswap, 0x9C578b573EdE001b95d51a55A3FAfb45f5608b1f, address(0));
+        dexAggregator.addDex(DexAggregator.DexType.Shibaswap, 0x03f7724180AA6b939894B5Ca4314783B0b36b329, address(0));
+        dexAggregator.addDex(DexAggregator.DexType.Smardex, 0xC33984ABcAe20f47a754eF78f6526FeF266c0C6F, address(0));
+        dexAggregator.addDex(DexAggregator.DexType.Swapr, 0xB9960d9bcA016e9748bE75dd52F02188B9d0829f, address(0));
+        dexAggregator.addDex(DexAggregator.DexType.Solidly, 0x77784f96C936042A3ADB1dD29C91a55EB2A4219f, address(0));
+        dexAggregator.addDex(DexAggregator.DexType.Verse, 0xB4B0ea46Fe0E9e8EAB4aFb765b527739F2718671, address(0));
+        dexAggregator.addDex(DexAggregator.DexType.X7Finance, 0x6b5422D584943BC8Cd0E10e239d624c6fE90fbB8, address(0));
     }
 
     // Fix this function to handle payable address

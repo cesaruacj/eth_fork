@@ -17,14 +17,7 @@ const ETHERSCAN_API = 'https://api.etherscan.io/api';
 
 // DEX contracts - mantener igual
 const DEX_CONTRACTS = {
-  SushiSwapV2: {
-    Factory: '0xC0AEe478e3658e2610c5F7A4A2E1777cE9e4f2Ac',
-    Router: '0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F'
-  },
-  SushiSwapV3: {
-    Factory: '0xbACEB8eC6b9355Dfc0269C18bac9d6E2Bdc29C4F',
-    Router: '0x2214a42d8e2a1d20635c2cb0664422c528b6a432'
-  },
+
   UniswapV2: {
     Factory: '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f',
     Router: '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D'
@@ -38,6 +31,14 @@ const DEX_CONTRACTS = {
     Factory: '0x000000000004444c5dc75cB358380D2e3dE08A90',
     Router: '0x66a9893cC07D91D95644AEDD05D03f95e1dBA8Af',
     Quoter: '0x52F0E24D1c21C8A0cB1e5a5dD6198556BD9E1203'
+  },
+  SushiSwapV2: {
+    Factory: '0xC0AEe478e3658e2610c5F7A4A2E1777cE9e4f2Ac',
+    Router: '0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F'
+  },
+  SushiSwapV3: {
+    Factory: '0xbACEB8eC6b9355Dfc0269C18bac9d6E2Bdc29C4F',
+    Router: '0x2E6cd2d30aa43f40aa81619ff4b6E0a41479B13F'
   },
   PancakeSwapV2: {
     Factory: '0x1097053Fd2ea711dad45caCcc45EfF7548fCB362',
