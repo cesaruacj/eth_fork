@@ -1,8 +1,8 @@
-import { ethers } from "hardhat"; // Cambia "ethers" por "hardhat"
+import { ethers } from "ethers";
 import * as dotenv from "dotenv";
 import * as fs from "fs";
 import * as path from "path";
-import { execSync } from "child_process"; // Añadir esta importación
+import { execSync } from "child_process";
 import { FlashbotsBundleProvider } from '@flashbots/ethers-provider-bundle';
 import { DEX_ROUTERS, AAVE_V3, DEPLOYED_CONTRACTS } from "../config/addresses";
 dotenv.config();
@@ -87,9 +87,6 @@ async function setupFlashbots() {
   }
 }
 
-// Llamar a esta función durante la inicialización
-await setupFlashbots();
-
 // Función para obtener datos de gas optimizados
 async function getOptimizedGasData() {
   try {
@@ -110,7 +107,16 @@ async function getOptimizedGasData() {
 }
 
 // Esta variable guardará los datos de gas actualizados
-let currentGasData = await getOptimizedGasData();
+let currentGasData: any;
+
+// Función de inicialización
+async function initialize() {
+  await setupFlashbots();
+  currentGasData = await getOptimizedGasData();
+  
+  // Ahora puedes iniciar el monitor
+  await monitor();
+}
 
 // Función para actualizar datos de liquidez antes de ejecutar el arbitraje
 async function updateLiquidityData() {
@@ -225,7 +231,7 @@ interface ArbitrageOpportunity {
 }
 
 // Configuración de provider y wallet
-const provider = ethers.provider;
+const hardhatProvider = ethers.provider;
 
 let wallet;
 async function initWallet() {
@@ -244,7 +250,7 @@ async function getEthPriceFromChainlink(): Promise<number> {
     const priceFeed = new ethers.Contract(
       ETH_USD_FEED_ADDRESS,
       chainlinkAggregatorABI,
-      provider
+      hardhatProvider
     );
     
     // Obtener datos del último precio y decimales
@@ -267,6 +273,39 @@ async function validateArbitrageProfitability(opportunity: ArbitrageOpportunity)
   // Esto significa que debemos tener alta confianza en nuestros datos iniciales
   console.log(`⚡ Modo de alta velocidad: omitiendo validaciones adicionales para ganar ventaja temporal`);
   return true;
+}
+
+// Añadir esta función para enviar transacciones críticas con máxima prioridad
+
+async function sendCriticalTransaction(tx: any, priorityLevel: 'high' | 'extreme' = 'high'): Promise<any> {
+  // Obtener el último bloque para información actualizada
+  const latestBlock = await hardhatProvider.getBlock("latest");
+  const baseFeePerGas = latestBlock.baseFeePerGas || ethers.BigNumber.from("100000000");
+  
+  // Calcular gas según nivel de prioridad
+  let maxPriorityFeePerGas;
+  let maxFeePerGas;
+  
+  if (priorityLevel === 'extreme') {
+    // Modo extremo: 5x la base fee + 50 gwei de propina
+    maxPriorityFeePerGas = ethers.utils.parseUnits("50", "gwei");
+    maxFeePerGas = baseFeePerGas.mul(5).add(maxPriorityFeePerGas);
+  } else {
+    // Modo alto: 2x la base fee + 10 gwei de propina
+    maxPriorityFeePerGas = ethers.utils.parseUnits("10", "gwei");
+    maxFeePerGas = baseFeePerGas.mul(2).add(maxPriorityFeePerGas);
+  }
+  
+  // Modificar la transacción con el gas calculado
+  tx.maxFeePerGas = maxFeePerGas;
+  tx.maxPriorityFeePerGas = maxPriorityFeePerGas;
+  
+  console.log(`🚀 Enviando transacción ${priorityLevel === 'extreme' ? 'EXTREMADAMENTE' : 'ALTAMENTE'} prioritaria`);
+  console.log(`   Max Fee: ${ethers.utils.formatUnits(maxFeePerGas, "gwei")} gwei`);
+  console.log(`   Priority Fee: ${ethers.utils.formatUnits(maxPriorityFeePerGas, "gwei")} gwei`);
+  
+  // Enviar la transacción con la wallet principal
+  return await wallet.sendTransaction(tx);
 }
 
 // Función principal de monitoreo
@@ -505,7 +544,7 @@ async function findArbitrageOpportunities(prices: TokenPrice[]): Promise<Arbitra
   });
   
   // Obtener datos de gas y precio ETH para cálculos precisos
-  const feeData = await provider.getFeeData();
+  const feeData = await hardhatProvider.getFeeData();
   const gasPrice = feeData.gasPrice || ethers.BigNumber.from("50000000000"); // 50 gwei default
   const gasPriceGwei = parseFloat(ethers.utils.formatUnits(gasPrice, "gwei"));
   
@@ -702,7 +741,7 @@ async function executeFlashLoan(opportunity: ArbitrageOpportunity): Promise<bool
       tokenContract = new ethers.Contract(
         opportunity.flashLoanToken,
         erc20ABI,
-        provider
+        hardhatProvider
       );
       const initialTokenBalance = await tokenContract.balanceOf(wallet.address);
       const symbol = await tokenContract.symbol();
@@ -751,7 +790,7 @@ async function executeFlashLoan(opportunity: ArbitrageOpportunity): Promise<bool
         console.log("🔥 Enviando bundle a Flashbots...");
         
         // Obtener bloque actual
-        const blockNumber = await provider.getBlockNumber();
+        const blockNumber = await hardhatProvider.getBlockNumber();
         
         // Crear bundle para los siguientes 3 bloques
         const bundle = [{
@@ -794,8 +833,8 @@ async function executeFlashLoan(opportunity: ArbitrageOpportunity): Promise<bool
   }
 }
 
-// Ejecutar el monitor
+// Ejecutar el monitor desde la inicialización
 console.log(`🚀 Monitor de Arbitraje FlashLoan v3.0`);
 console.log(`   Ejecución habilitada: ${IS_EXECUTION_ENABLED ? 'Sí' : 'No'}`);
 console.log(`   Umbral de beneficio: $${MIN_PROFIT_USD} (después de todos los costos)`);
-monitor().catch(console.error);
+initialize().catch(console.error);
