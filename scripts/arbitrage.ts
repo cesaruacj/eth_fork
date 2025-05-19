@@ -1,4 +1,4 @@
-import { ethers } from "ethers";
+import { ethers } from "hardhat";
 import * as dotenv from "dotenv";
 import * as fs from "fs";
 import * as path from "path";
@@ -109,33 +109,54 @@ async function getOptimizedGasData() {
 // Esta variable guardará los datos de gas actualizados
 let currentGasData: any;
 
-// Función de inicialización
-async function initialize() {
-  await setupFlashbots();
-  currentGasData = await getOptimizedGasData();
+// Add this to your initialize() function in arbitrage.ts
+async function setupContracts() {
+  console.log("🔧 Setting up contracts...");
   
-  // Ahora puedes iniciar el monitor
-  await monitor();
+  // Get contract instances
+  const flashLoanContract = new ethers.Contract(
+    FLASH_LOAN_CONTRACT,
+    flashLoanArbitrageABI,
+    wallet
+  );
+  
+  // Check if intermediaryTokens are already configured
+  try {
+    const firstToken = await flashLoanContract.intermediaryTokens(0);
+    console.log(`✅ Intermediary tokens already configured (first: ${firstToken})`);
+  } catch (error) {
+    console.log("🔄 Setting up intermediary tokens...");
+    const tx = await flashLoanContract.setupIntermediaryTokens({
+      maxFeePerGas: ethers.utils.parseUnits("2.0", "gwei"),     // Mayor que el baseFeePerGas actual
+      maxPriorityFeePerGas: ethers.utils.parseUnits("0.5", "gwei")
+    });
+    await tx.wait();
+    console.log("✅ Intermediary tokens configured");
+  }
 }
 
-// Función para actualizar datos de liquidez antes de ejecutar el arbitraje
-async function updateLiquidityData() {
-  if (UPDATE_LIQUIDITY_DATA) {
-    console.log("🔄 Actualizando datos de pools de liquidez...");
-    try {
-      // Ejecutar el script liquidity.ts usando Hardhat
-      execSync('npx hardhat run scripts/liquidity.ts --network localhost', { 
-        stdio: 'inherit', // Mostrar output en consola
-        encoding: 'utf-8'
-      });
-      console.log("✅ Datos de liquidez actualizados correctamente");
-    } catch (error) {
-      console.error("❌ Error al actualizar datos de liquidez:", error);
-      process.exit(1); // Salir si falla la actualización de datos
-    }
+// Función de inicialización
+async function initialize() {
+  console.log("🔄 Initializing arbitrage system...");
+  
+  // First, initialize wallet
+  await initWallet();
+  
+  // Then set up flashbots
+  await setupFlashbots();
+  
+  // Get gas data
+  currentGasData = await getOptimizedGasData();
+  
+  // Only set up contracts if wallet is properly initialized
+  if (wallet) {
+    await setupContracts();
+    console.log("✅ Contracts initialized successfully");
   } else {
-    console.log("ℹ️ Usando datos de liquidez existentes");
+    console.log("⚠️ No wallet available - running in monitoring mode only");
   }
+  
+  await monitor();
 }
 
 // Modificar updateDexInfo para cargar todos los DEXes disponibles
@@ -235,9 +256,17 @@ const hardhatProvider = ethers.provider;
 
 let wallet;
 async function initWallet() {
-  const signers = await ethers.getSigners();
-  wallet = signers[0];
-  console.log(`Usando cuenta: ${wallet.address}`);
+  try {
+    const signers = await ethers.getSigners();
+    if (signers && signers.length > 0) {
+      wallet = signers[0];
+      console.log(`✅ Wallet initialized: ${wallet.address}`);
+    } else {
+      console.log("❌ No signers available from Hardhat");
+    }
+  } catch (error) {
+    console.error("❌ Error initializing wallet:", error.message);
+  }
 }
 
 if (IS_EXECUTION_ENABLED && !wallet) {
@@ -318,9 +347,6 @@ async function monitor() {
     
     // Configurar Flashbots Provider
     await setupFlashbots();
-
-    // Actualizar datos de liquidez primero
-    await updateLiquidityData();
     
     // Cargar datos de pools desde dexespools.json
     const poolData = await loadPoolData();
@@ -744,12 +770,9 @@ async function executeFlashLoan(opportunity: ArbitrageOpportunity): Promise<bool
         hardhatProvider
       );
       const initialTokenBalance = await tokenContract.balanceOf(wallet.address);
-      const symbol = await tokenContract.symbol();
-      const decimals = await tokenContract.decimals();
-      console.log(`💰 Balance inicial ${symbol}: ${ethers.utils.formatUnits(initialTokenBalance, decimals)}`);
     }
-    
-    // Preparar la transacción de préstamo flash
+
+    // Create flash loan contract instance
     const flashLoanContract = new ethers.Contract(
       FLASH_LOAN_CONTRACT,
       flashLoanArbitrageABI,
@@ -776,29 +799,29 @@ async function executeFlashLoan(opportunity: ArbitrageOpportunity): Promise<bool
       }
     );
     
-    // Firmar la transacción
-    const signedTx = await wallet.signTransaction(unsignedTx);
-    
-    // ESTRATEGIA 1: ENVÍO DIRECTO CON GAS AGRESIVO
-    console.log("💨 Enviando transacción con gas agresivo...");
+    // STRATEGY 1: Direct transaction sending
+    console.log("💨 Sending transaction with aggressive gas...");
     const tx = await wallet.sendTransaction(unsignedTx);
-    console.log(`✅ Transacción enviada: ${tx.hash}`);
+    console.log(`✅ Transaction sent: ${tx.hash}`);
     
-    // ESTRATEGIA 2: MEV-BUNDLE VIA FLASHBOTS (SIMULTANEAMENTE)
+    // STRATEGY 2: MEV-BUNDLE VIA FLASHBOTS
     if (flashbotsProvider) {
       try {
         console.log("🔥 Enviando bundle a Flashbots...");
+        
+        // Create bundle with unsigned transaction
+        const bundle = [{
+          transaction: {
+            ...unsignedTx,
+            nonce: await wallet.getTransactionCount(),
+          },
+          signer: wallet
+        }];
         
         // Obtener bloque actual
         const blockNumber = await hardhatProvider.getBlockNumber();
         
         // Crear bundle para los siguientes 3 bloques
-        const bundle = [{
-          transaction: signedTx,
-          signer: wallet
-        }];
-        
-        // Enviar bundle a Flashbots
         for (let i = 1; i <= 3; i++) {
           await flashbotsProvider.sendBundle(bundle, blockNumber + i);
         }
