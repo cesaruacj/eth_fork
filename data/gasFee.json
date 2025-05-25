@@ -1,19 +1,91 @@
 {
-  "lastUpdate": 1747614701,
-  "lastUpdateDate": "2025-05-19T00:31:41.713Z",
+  "lastUpdate": 1748061341,
+  "lastUpdateDate": "2025-05-24T04:35:41.345Z",
   "current": {
-    "timestamp": 1747614701,
-    "date": "2025-05-19T00:31:41.713Z",
-    "baseFeePerGas": "2005000896",
-    "maxFeePerGas": "5510001792",
+    "timestamp": 1748061341,
+    "date": "2025-05-24T04:35:41.345Z",
+    "baseFeePerGas": "1051408689",
+    "maxFeePerGas": "3602817378",
     "maxPriorityFeePerGas": "1500000000",
-    "gasPrice": "2006274178",
-    "baseFeePerGasGwei": 2.005000896,
-    "maxFeePerGasGwei": 5.510001792,
+    "gasPrice": "1051508689",
+    "baseFeePerGasGwei": 1.051408689,
+    "maxFeePerGasGwei": 3.602817378,
     "maxPriorityFeePerGasGwei": 1.5,
-    "gasPriceGwei": 2.006274178
+    "gasPriceGwei": 1.051508689
   },
   "history": [
+    {
+      "timestamp": 1748061341,
+      "date": "2025-05-24T04:35:41.345Z",
+      "baseFeePerGas": "1051408689",
+      "maxFeePerGas": "3602817378",
+      "maxPriorityFeePerGas": "1500000000",
+      "gasPrice": "1051508689",
+      "baseFeePerGasGwei": 1.051408689,
+      "maxFeePerGasGwei": 3.602817378,
+      "maxPriorityFeePerGasGwei": 1.5,
+      "gasPriceGwei": 1.051508689
+    },
+    {
+      "timestamp": 1748061230,
+      "date": "2025-05-24T04:33:50.702Z",
+      "baseFeePerGas": "907594546",
+      "maxFeePerGas": "3328178412",
+      "maxPriorityFeePerGas": "1500000000",
+      "gasPrice": "907694546",
+      "baseFeePerGasGwei": 0.907594546,
+      "maxFeePerGasGwei": 3.328178412,
+      "maxPriorityFeePerGasGwei": 1.5,
+      "gasPriceGwei": 0.907694546
+    },
+    {
+      "timestamp": 1748061017,
+      "date": "2025-05-24T04:30:17.274Z",
+      "baseFeePerGas": "555669707",
+      "maxFeePerGas": "2611339414",
+      "maxPriorityFeePerGas": "1500000000",
+      "gasPrice": "555769707",
+      "baseFeePerGasGwei": 0.555669707,
+      "maxFeePerGasGwei": 2.611339414,
+      "maxPriorityFeePerGasGwei": 1.5,
+      "gasPriceGwei": 0.555769707
+    },
+    {
+      "timestamp": 1748060454,
+      "date": "2025-05-24T04:20:54.269Z",
+      "baseFeePerGas": "594033249",
+      "maxFeePerGas": "2688066498",
+      "maxPriorityFeePerGas": "1500000000",
+      "gasPrice": "594133249",
+      "baseFeePerGasGwei": 0.594033249,
+      "maxFeePerGasGwei": 2.688066498,
+      "maxPriorityFeePerGasGwei": 1.5,
+      "gasPriceGwei": 0.594133249
+    },
+    {
+      "timestamp": 1748059678,
+      "date": "2025-05-24T04:07:58.830Z",
+      "baseFeePerGas": "579715133",
+      "maxFeePerGas": "2659430266",
+      "maxPriorityFeePerGas": "1500000000",
+      "gasPrice": "579815133",
+      "baseFeePerGasGwei": 0.579715133,
+      "maxFeePerGasGwei": 2.659430266,
+      "maxPriorityFeePerGasGwei": 1.5,
+      "gasPriceGwei": 0.579815133
+    },
+    {
+      "timestamp": 1748058377,
+      "date": "2025-05-24T03:46:17.008Z",
+      "baseFeePerGas": "501495750",
+      "maxFeePerGas": "2502991500",
+      "maxPriorityFeePerGas": "1500000000",
+      "gasPrice": "501595750",
+      "baseFeePerGasGwei": 0.50149575,
+      "maxFeePerGasGwei": 2.5029915,
+      "maxPriorityFeePerGasGwei": 1.5,
+      "gasPriceGwei": 0.50159575
+    },
     {
       "timestamp": 1747614701,
       "date": "2025-05-19T00:31:41.713Z",
@@ -1141,78 +1213,6 @@
       "maxFeePerGasGwei": 2.335299428,
       "maxPriorityFeePerGasGwei": 1.5,
       "gasPriceGwei": 0.417969314
-    },
-    {
-      "timestamp": 1745805933,
-      "date": "2025-04-28T02:05:33.833Z",
-      "baseFeePerGas": "417649714",
-      "maxFeePerGas": "2335299428",
-      "maxPriorityFeePerGas": "1500000000",
-      "gasPrice": "417969314",
-      "baseFeePerGasGwei": 0.417649714,
-      "maxFeePerGasGwei": 2.335299428,
-      "maxPriorityFeePerGasGwei": 1.5,
-      "gasPriceGwei": 0.417969314
-    },
-    {
-      "timestamp": 1745805933,
-      "date": "2025-04-28T02:05:33.339Z",
-      "baseFeePerGas": "417649714",
-      "maxFeePerGas": "2335299428",
-      "maxPriorityFeePerGas": "1500000000",
-      "gasPrice": "417969314",
-      "baseFeePerGasGwei": 0.417649714,
-      "maxFeePerGasGwei": 2.335299428,
-      "maxPriorityFeePerGasGwei": 1.5,
-      "gasPriceGwei": 0.417969314
-    },
-    {
-      "timestamp": 1745805932,
-      "date": "2025-04-28T02:05:32.473Z",
-      "baseFeePerGas": "371271415",
-      "maxFeePerGas": "2242542830",
-      "maxPriorityFeePerGas": "1500000000",
-      "gasPrice": "371591015",
-      "baseFeePerGasGwei": 0.371271415,
-      "maxFeePerGasGwei": 2.24254283,
-      "maxPriorityFeePerGasGwei": 1.5,
-      "gasPriceGwei": 0.371591015
-    },
-    {
-      "timestamp": 1745805931,
-      "date": "2025-04-28T02:05:31.979Z",
-      "baseFeePerGas": "371271415",
-      "maxFeePerGas": "2242542830",
-      "maxPriorityFeePerGas": "1500000000",
-      "gasPrice": "371591015",
-      "baseFeePerGasGwei": 0.371271415,
-      "maxFeePerGasGwei": 2.24254283,
-      "maxPriorityFeePerGasGwei": 1.5,
-      "gasPriceGwei": 0.371591015
-    },
-    {
-      "timestamp": 1745805931,
-      "date": "2025-04-28T02:05:31.492Z",
-      "baseFeePerGas": "371271415",
-      "maxFeePerGas": "2242542830",
-      "maxPriorityFeePerGas": "1500000000",
-      "gasPrice": "371591015",
-      "baseFeePerGasGwei": 0.371271415,
-      "maxFeePerGasGwei": 2.24254283,
-      "maxPriorityFeePerGasGwei": 1.5,
-      "gasPriceGwei": 0.371591015
-    },
-    {
-      "timestamp": 1745805930,
-      "date": "2025-04-28T02:05:30.753Z",
-      "baseFeePerGas": "371271415",
-      "maxFeePerGas": "2242542830",
-      "maxPriorityFeePerGas": "1500000000",
-      "gasPrice": "371591015",
-      "baseFeePerGasGwei": 0.371271415,
-      "maxFeePerGasGwei": 2.24254283,
-      "maxPriorityFeePerGasGwei": 1.5,
-      "gasPriceGwei": 0.371591015
     }
   ]
 }

@@ -517,7 +517,9 @@ contract DexAggregator {
         uint256 balanceAfter = IERC20(tokenOut).balanceOf(address(this));
         uint256 actualAmountOut = balanceAfter - balanceBefore;
         
-        emit SwapExecuted(tokenIn, tokenOut, amountIn, actualAmountOut, dexIndex);
+        emit SwapExecuted(tokenIn, tokenOut, amountIn, 0, dexIndex); // Log pre-swap
+        
+        emit SwapExecuted(tokenIn, tokenOut, amountIn, actualAmountOut, dexIndex); // Log post-swap
         
         return actualAmountOut;
     }
@@ -549,7 +551,7 @@ contract DexAggregator {
             amountOutMin,
             path,
             address(this),
-            block.timestamp + 300 // 5 minutes deadline
+            block.timestamp + 300
         );
         
         return amounts[1]; // Return the expected amount

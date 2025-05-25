@@ -46,6 +46,11 @@ contract FlashLoanArbitrage is Ownable, ReentrancyGuard, IFlashLoanSimpleReceive
     /// @notice Lista de tokens intermediarios para arbitraje
     address[] public intermediaryTokens;
 
+    /// @notice Evento de depuración para seguimiento de operaciones
+    event DebugLog(string message, uint256 value);
+    event DebugTokenPath(string operation, address baseToken, address quoteToken);
+    event DebugTokenOperation(address token, uint256 amountBefore, uint256 amountAfter);
+
     /**
      * @dev Constructor initializes the contract with Aave provider and DexAggregator
      * @param provider Aave PoolAddressesProvider address
@@ -81,8 +86,16 @@ contract FlashLoanArbitrage is Ownable, ReentrancyGuard, IFlashLoanSimpleReceive
      * @param amount Cantidad
      */
     function executeFlashLoanSimple(address asset, uint256 amount) external onlyOwner {
+        emit DebugLog("1. Inicio executeFlashLoanSimple", amount);
         require(amount > 0, "Amount must be greater than 0");
+        emit DebugLog("2. Amount > 0", amount);
+        
         require(asset != address(0), "Invalid asset address");
+        emit DebugLog("3. Asset es valido", 0);
+        
+        // Comprobar balance antes del flash loan
+        uint256 balanceBefore = IERC20(asset).balanceOf(address(this));
+        emit DebugLog("4. Balance antes", balanceBefore);
         
         POOL.flashLoanSimple(
             address(this),
@@ -91,6 +104,8 @@ contract FlashLoanArbitrage is Ownable, ReentrancyGuard, IFlashLoanSimpleReceive
             "",
             0
         );
+        
+        emit DebugLog("5. FlashLoan completado", 0);
     }
 
     /**
@@ -109,40 +124,58 @@ contract FlashLoanArbitrage is Ownable, ReentrancyGuard, IFlashLoanSimpleReceive
         address initiator,
         bytes calldata params
     ) external override returns (bool) {
+        emit DebugLog("6. Inicio executeOperation", amount);
+        
         require(msg.sender == address(POOL), "Caller must be Aave Pool");
+        emit DebugLog("7. Caller es Pool", 0);
+        
         require(initiator == address(this), "Initiator must be this contract");
+        emit DebugLog("8. Initiator es this", 0);
+        
         require(!_flashLoanReentrancyGuard, "Reentrant call");
+        emit DebugLog("9. No es reentrada", 0);
 
         _flashLoanReentrancyGuard = true;
 
         uint256 amountOwing = amount + premium;
+        emit DebugLog("10. AmountOwing", amountOwing);
 
-        // Verificar que tenemos al menos el premium pre-fondeado
+        // Verificar premium
+        uint256 currentBalance = IERC20(asset).balanceOf(address(this));
+        emit DebugLog("11. Balance actual", currentBalance);
+        
         require(
             IERC20(asset).balanceOf(address(this)) >= premium,
             "Insufficient premium"
         );
+        emit DebugLog("12. Premium suficiente", premium);
 
-        // Ejecutar la lógica de arbitraje interna
+        // Ejecutar arbitraje
+        emit DebugLog("13. Antes de executeArbitrage", amount);
         (uint256 received, uint256 operationProfit) = _executeArbitrage(
             asset,
             amount,
             amountOwing
         );
+        emit DebugLog("14. Despues de executeArbitrage", received);
 
-        // Aprobar a Aave Pool para que retire amount + premium
-        IERC20(asset).safeApprove(address(POOL), 0); // Limpiar aprobación previa
+        // Aprobar repago
+        emit DebugLog("15. Antes de aprobar POOL", amountOwing);
+        IERC20(asset).safeApprove(address(POOL), 0);
         IERC20(asset).safeApprove(address(POOL), amountOwing);
+        emit DebugLog("16.Despues de aprobar POOL", 0);
 
-        // Transferir cualquier ganancia restante al propietario
+        // Transferir ganancias
         uint256 remainingBalance = IERC20(asset).balanceOf(address(this));
+        emit DebugLog("17. Balance restante", remainingBalance);
+        
         if (remainingBalance > amountOwing) {
             uint256 transferProfit = remainingBalance - amountOwing;
+            emit DebugLog("18. Profit a transferir", transferProfit);
             IERC20(asset).safeTransfer(msg.sender, transferProfit);
         }
 
-        emit ArbitrageExecuted(asset, amount, received, operationProfit);
-        
+        emit DebugLog("19. Final executeOperation", 0);
         _flashLoanReentrancyGuard = false;
         return true;
     }
@@ -160,76 +193,135 @@ contract FlashLoanArbitrage is Ownable, ReentrancyGuard, IFlashLoanSimpleReceive
         uint256 amountIn,
         uint256 amountOwing
     ) internal returns (uint256 receivedAmount, uint256 profit) {
+        emit DebugLog("20. Inicio _executeArbitrage", amountIn);
+        
         require(intermediaryTokens.length > 0, "No intermediary tokens configured");
+        emit DebugLog("21. Intermediary tokens OK", intermediaryTokens.length);
         
         uint256 initialBalance = IERC20(tokenIn).balanceOf(address(this));
+        emit DebugLog("22. Initial balance", initialBalance);
+        
         uint256 bestReceivedAmount = 0;
         address bestIntermediaryToken;
         uint256 bestFirstDexIndex;
         uint256 bestSecondDexIndex;
         uint256 bestMidAmountOut;
         
-        // Find the most profitable path across all intermediary tokens
+        // Find best path
+        emit DebugLog("23. Searching paths", intermediaryTokens.length);
         for (uint256 i = 0; i < intermediaryTokens.length; i++) {
             address intermediaryToken = intermediaryTokens[i];
             
-            // Skip if intermediaryToken is the same as tokenIn
+            // Skip if same
             if (intermediaryToken == tokenIn) continue;
             
-            // Get quotes for this path
+            emit DebugTokenPath("24. Path check", tokenIn, intermediaryToken);
+            
+            // Get quotes
             (uint256 midAmountOut, uint256 firstDexIndex) = dexAggregator
                 .getBestDexQuote(tokenIn, intermediaryToken, amountIn);
-                
-            if (midAmountOut == 0) continue; // Skip if no liquidity
-                
+        
+            emit DebugLog("25. First quote", midAmountOut);
+            
+            if (midAmountOut == 0) continue;
+            
             (uint256 finalAmountOut, uint256 secondDexIndex) = dexAggregator
                 .getBestDexQuote(intermediaryToken, tokenIn, midAmountOut);
-                
+        
+            emit DebugLog("26. Second quote", finalAmountOut);
+            
             if (finalAmountOut > bestReceivedAmount) {
                 bestReceivedAmount = finalAmountOut;
                 bestIntermediaryToken = intermediaryToken;
                 bestFirstDexIndex = firstDexIndex;
                 bestSecondDexIndex = secondDexIndex;
                 bestMidAmountOut = midAmountOut;
+                emit DebugLog("27. New best path", bestReceivedAmount);
             }
         }
         
-        // Execute the best path if profitable
+        emit DebugLog("28. Best received amount", bestReceivedAmount);
+        
+        // Execute if profitable
         if (bestReceivedAmount > amountIn) {
-            // Execute first swap
+            emit DebugLog("29. Path is profitable", bestReceivedAmount - amountIn);
+            
+            // First swap approval
+            emit DebugLog("30. Before first approval", amountIn);
             IERC20(tokenIn).safeApprove(address(dexAggregator), 0);
             IERC20(tokenIn).safeApprove(address(dexAggregator), amountIn);
             
-            uint256 midAmount = dexAggregator.swapOnDex(
+            // Execute first swap
+            emit DebugLog("31. Before first swap", bestFirstDexIndex);
+            uint256 balanceBeforeSwap1 = IERC20(bestIntermediaryToken).balanceOf(address(this));
+            emit DebugLog("Before first swap with params", amountIn);
+            emit DebugLog("Expected min output", (bestMidAmountOut * 995) / 1000);
+
+            uint256 midAmount;
+            try dexAggregator.swapOnDex(
                 bestFirstDexIndex,
                 tokenIn,
                 bestIntermediaryToken,
                 amountIn,
-                (bestMidAmountOut * 995) / 1000 // 0.5% slippage
-            );
+                (bestMidAmountOut * 995) / 1000
+            ) returns (uint256 _midAmount) {
+                midAmount = _midAmount;
+                emit DebugLog("Swap successful", midAmount);
+            } catch Error(string memory reason) {
+                emit DebugLog("Swap failed with reason", 0);
+                revert(reason);
+            } catch {
+                emit DebugLog("Swap failed without reason", 0);
+                revert("First swap failed silently");
+            }
+            uint256 balanceAfterSwap1 = IERC20(bestIntermediaryToken).balanceOf(address(this));
+            emit DebugTokenOperation(bestIntermediaryToken, balanceBeforeSwap1, balanceAfterSwap1);
+            emit DebugLog("32. After first swap", midAmount);
             
-            // Execute second swap
+            // Second swap approval
+            emit DebugLog("33. Before second approval", midAmount);
             IERC20(bestIntermediaryToken).safeApprove(address(dexAggregator), 0);
             IERC20(bestIntermediaryToken).safeApprove(address(dexAggregator), midAmount);
             
-            receivedAmount = dexAggregator.swapOnDex(
+            // Ejecutar segundo swap
+            emit DebugLog("34. Before second swap", bestSecondDexIndex);
+            uint256 balanceBeforeSwap2 = IERC20(tokenIn).balanceOf(address(this));
+
+            try dexAggregator.swapOnDex(
                 bestSecondDexIndex,
                 bestIntermediaryToken,
                 tokenIn,
                 midAmount,
-                (bestReceivedAmount * 995) / 1000 // 0.5% slippage
-            );
+                (bestReceivedAmount * 995) / 1000
+            ) returns (uint256 _receivedAmount) {
+                receivedAmount = _receivedAmount;
+                emit DebugLog("Second swap successful", receivedAmount);
+            } catch Error(string memory reason) {
+                emit DebugLog("Second swap failed with reason", 0);
+                revert(reason);
+            } catch {
+                emit DebugLog("Second swap failed without reason", 0);
+                revert("Second swap failed silently");
+            }
+            uint256 balanceAfterSwap2 = IERC20(tokenIn).balanceOf(address(this));
+            emit DebugTokenOperation(tokenIn, balanceBeforeSwap2, balanceAfterSwap2);
+            emit DebugLog("35. After second swap", receivedAmount);
+        } else {
+            emit DebugLog("29b. No profitable path found", bestReceivedAmount);
         }
         
-        // Calculate profit
+        // Calculate final profit
         uint256 finalBalance = IERC20(tokenIn).balanceOf(address(this));
-        uint256 netGain = 0;
+        emit DebugLog("36. Final balance", finalBalance);
         
+        uint256 netGain = 0;
         if (finalBalance > initialBalance) {
             netGain = finalBalance - initialBalance;
+            emit DebugLog("37. Net gain positive", netGain);
         }
         
         profit = netGain > amountOwing ? netGain - amountOwing : 0;
+        emit DebugLog("38. Final profit", profit);
         
         return (receivedAmount, profit);
     }
