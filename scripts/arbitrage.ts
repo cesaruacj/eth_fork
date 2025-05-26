@@ -52,7 +52,6 @@ const DEX_NAME_TO_INDEX = {
   'solidlydex': 24,                  // Solidly
   'swapr_ethereum': 25,             // Swapr
   'verse': 26,                      // Verse
-  'x7-finance-ethereum': 27,        // X7Finance
 
 };
 
@@ -148,6 +147,9 @@ async function initialize() {
   // Get gas data
   currentGasData = await getOptimizedGasData();
   
+  // Load Aave reserves data
+  const aaveReserves = await loadAaveReservesData();
+  
   // Only set up contracts if wallet is properly initialized
   if (wallet) {
     await setupContracts();
@@ -165,25 +167,28 @@ async function updateDexInfo(dexPoolsData: any) {
   DEXES = Object.keys(dexPoolsData);
   console.log(`🔍 Cargados ${DEXES.length} DEXes desde dexespools.json`);
   
-  // Crear DEX_INFO dinámicamente
+  // Crear DEX_INFO dinámicamente usando el mapeo completo
   DEX_INFO = {};
   for (const dex of DEXES) {
-    // Asignar tipo y nombre por defecto
-    let type = 0;
     let name = dex.replace(/_/g, ' ').replace(/-/g, ' ');
     
-    // Asignar tipos específicos para DEXes conocidos
-    if (dex.includes('uniswap_v3') || dex.includes('sushiswap-v3')) type = 1;
-    else if (dex === 'sushiswap') type = 2;
-    else if (dex.includes('uniswap-v4')) type = 3;
-    else if (dex.includes('pancakeswap')) type = 4;
-    else if (dex.includes('balancer')) type = 5;
-    else if (dex === 'curve') type = 6;
+    // Use the existing DEX_NAME_TO_INDEX mapping to get the correct type
+    let type = DEX_NAME_TO_INDEX[dex];
+    
+    // If the DEX is not in our mapping, assign a default type
+    if (type === undefined) {
+      console.warn(`⚠️ DEX '${dex}' not found in DEX_NAME_TO_INDEX mapping, assigning type 0`);
+      type = 0;
+    }
     
     DEX_INFO[dex] = { name, type };
   }
   
   console.log(`✅ ${Object.keys(DEX_INFO).length} DEXes configurados para arbitraje`);
+  
+  // Log which DEXes were mapped successfully
+  const mappedCount = Object.values(DEX_INFO).filter(info => info.type !== 0).length;
+  console.log(`📊 ${mappedCount} DEXes mapeados a índices específicos, ${Object.keys(DEX_INFO).length - mappedCount} usando índice por defecto`);
 }
 
 // ================================
@@ -293,6 +298,38 @@ async function getEthPriceFromChainlink(): Promise<number> {
   } catch (error: any) {
     console.warn(`⚠️ Error al obtener precio de ETH desde Chainlink: ${error.message}`);
     throw error;
+  }
+}
+
+// Function to check if a token is available for flash loan in Aave
+async function isTokenAvailableForFlashloan(tokenAddress: string): Promise<boolean> {
+  try {
+    // Normalize the token address (to lowercase for comparison)
+    const normalizedTokenAddress = tokenAddress.toLowerCase();
+    
+    // Get token symbol (keep this part)
+    let symbol = "Unknown";
+    try {
+      const tokenContract = new ethers.Contract(tokenAddress, erc20ABI, hardhatProvider);
+      symbol = await tokenContract.symbol();
+    } catch (e) {
+      // Ignore error getting symbol
+    }
+    
+    console.log(`Checking if ${symbol} (${normalizedTokenAddress.substring(0, 10)}...) is available in Aave...`);
+    
+    // *** Use the loaded data instead of querying blockchain ***
+    const tokenData = aaveReservesMap[normalizedTokenAddress];
+    if (!tokenData) {
+      console.log(`Token ${symbol} not found in Aave reserves data`);
+      return false;
+    }
+    
+    console.log(`Token ${symbol}: Data found in JSON - isActive: ${tokenData.isActive}, flashLoanEnabled: ${tokenData.flashLoanEnabled}`);
+    return tokenData.isActive && tokenData.flashLoanEnabled;
+  } catch (error) {
+    console.log(`Error checking token ${tokenAddress.substring(0, 10)}...: ${error.message}`);
+    return false;
   }
 }
 
@@ -722,8 +759,35 @@ async function processOpportunities(opportunities: ArbitrageOpportunity[]) {
   if (IS_EXECUTION_ENABLED && wallet) {
     const bestOpportunity = opportunities[0];
     
-    if (bestOpportunity.netProfitUSD > MIN_PROFIT_USD * 1.5) { // Raise the threshold for execution
+    if (bestOpportunity.netProfitUSD > MIN_PROFIT_USD * 1.5) {
       console.log(`\n⚡ Verificando rentabilidad para la mejor oportunidad...`);
+      
+      // Check if token is available for flash loan in Aave
+      console.log(`\n🔍 Verificando disponibilidad del token en Aave...`);
+      const isAvailable = await isTokenAvailableForFlashloan(bestOpportunity.flashLoanToken);
+      
+      if (!isAvailable) {
+        console.log(`\n⚠️ El token ${bestOpportunity.baseTokenSymbol} no está disponible para préstamos flash en Aave.`);
+        // Try to find an alternative token pair that is available
+        console.log(`\n🔄 Buscando oportunidades alternativas con tokens disponibles en Aave...`);
+        
+        for (let i = 1; i < opportunities.length; i++) {
+          const altOpp = opportunities[i];
+          if (altOpp.netProfitUSD > MIN_PROFIT_USD) {
+            const altAvailable = await isTokenAvailableForFlashloan(altOpp.flashLoanToken);
+            if (altAvailable) {
+              console.log(`\n✅ Encontrada oportunidad alternativa con ${altOpp.baseTokenSymbol}/${altOpp.quoteTokenSymbol}`);
+              bestOpportunity = altOpp;
+              break;
+            }
+          }
+        }
+        
+        if (!await isTokenAvailableForFlashloan(bestOpportunity.flashLoanToken)) {
+          console.log(`\n❌ No se encontraron oportunidades con tokens disponibles en Aave`);
+          return;
+        }
+      }
       
       // Validate profitability before execution
       const stillProfitable = await validateArbitrageProfitability(bestOpportunity);
@@ -752,41 +816,52 @@ async function executeFlashLoan(opportunity: ArbitrageOpportunity): Promise<bool
   const buyDexIndex = DEX_NAME_TO_INDEX[opportunity.buyDex];
   const sellDexIndex = DEX_NAME_TO_INDEX[opportunity.sellDex];
   
-  if (buyDexIndex === undefined || sellDexIndex === undefined) {
-    console.log(`⚠️ No se encontró mapeo para índices de DEX`);
-    return false;
-  }
-  
   try {
-    // Obtener balance inicial para comparar después
-    const initialEthBalance = await wallet.getBalance();
+    // Log detailed transaction parameters
+    console.log(`\n🔍 DEBUG Transaction details:`);
+    console.log(`   Buy DEX: ${opportunity.buyDex} (Index: ${buyDexIndex})`);
+    console.log(`   Sell DEX: ${opportunity.sellDex} (Index: ${sellDexIndex})`);
     
-    // Preparar datos de token
-    let tokenContract;
-    if (opportunity.flashLoanToken !== ethers.constants.AddressZero) {
-      tokenContract = new ethers.Contract(
-        opportunity.flashLoanToken,
-        erc20ABI,
-        hardhatProvider
-      );
-      const initialTokenBalance = await tokenContract.balanceOf(wallet.address);
+    // Get token info
+    const tokenContract = new ethers.Contract(
+      opportunity.flashLoanToken,
+      erc20ABI,
+      hardhatProvider
+    );
+    
+    const decimals = await tokenContract.decimals();
+    const symbol = await tokenContract.symbol();
+    const flashLoanAmount = ethers.utils.parseUnits(opportunity.flashLoanAmount, decimals);
+    
+    console.log(`   Token: ${symbol} (${opportunity.flashLoanToken})`);
+    console.log(`   Amount: ${ethers.utils.formatUnits(flashLoanAmount, decimals)}`);
+    
+    // Get initial balances
+    const initialEthBalance = await wallet.getBalance();
+    let initialTokenBalance;
+    if (tokenContract) {
+      initialTokenBalance = await tokenContract.balanceOf(wallet.address);
     }
-
-    // Create flash loan contract instance
+    
+    // Flash loan contract
     const flashLoanContract = new ethers.Contract(
       FLASH_LOAN_CONTRACT,
       flashLoanArbitrageABI,
       wallet
     );
     
-    // Obtener detalles de token y formatear cantidad
-    const decimals = await tokenContract.decimals();
-    const symbol = await tokenContract.symbol();
-    const flashLoanAmount = ethers.utils.parseUnits(opportunity.flashLoanAmount, decimals);
-    
-    console.log(`\n🚀 EJECUTANDO ARBITRAJE USANDO MEV BUNDLE:`);
-    console.log(`   Par: ${opportunity.baseTokenSymbol}/${opportunity.quoteTokenSymbol}`);
-    console.log(`   Préstamo flash: ${ethers.utils.formatUnits(flashLoanAmount, decimals)} ${symbol}`);
+    // Try static call first to see if it would succeed
+    try {
+      console.log("🧪 Simulating transaction execution...");
+      await flashLoanContract.callStatic.executeFlashLoanSimple(
+        opportunity.flashLoanToken,
+        flashLoanAmount
+      );
+      console.log("✅ Simulation successful!");
+    } catch (simError: any) {
+      console.log(`❌ Simulation failed: ${simError.message}`);
+      // Continue anyway since we want to try the real transaction
+    }
     
     // Preparar la transacción sin enviarla
     const unsignedTx = await flashLoanContract.populateTransaction.executeFlashLoanSimple(
@@ -844,7 +919,6 @@ async function executeFlashLoan(opportunity: ArbitrageOpportunity): Promise<bool
     
     if (tokenContract) {
       const finalTokenBalance = await tokenContract.balanceOf(wallet.address);
-      const initialTokenBalance = await tokenContract.balanceOf(wallet.address); // Sí, esto debería estar antes, pero mantengo estructura
       const tokenDifference = finalTokenBalance.sub(initialTokenBalance);
       console.log(`📊 Cambio en ${symbol}: ${ethers.utils.formatUnits(tokenDifference, decimals)}`);
     }
@@ -852,12 +926,88 @@ async function executeFlashLoan(opportunity: ArbitrageOpportunity): Promise<bool
     return true;
   } catch (error: any) {
     console.error(`❌ Error en arbitraje: ${error.message}`);
+    
+    // Enhanced error logging
+    if (error.transaction) {
+      console.log(`   Transaction hash: ${error.transaction.hash}`);
+      console.log(`   To address: ${error.transaction.to}`);
+      console.log(`   Value: ${error.transaction.value.toString()}`);
+      console.log(`   Gas limit: ${error.transaction.gasLimit.toString()}`);
+    }
+    
+    if (error.receipt) {
+      console.log(`   Gas used: ${error.receipt.gasUsed.toString()}`);
+      console.log(`   Block number: ${error.receipt.blockNumber}`);
+    }
+    
+    // Check contract state
+    try {
+      console.log("\n📊 Checking contract state:");
+      const flashLoanContract = new ethers.Contract(
+        FLASH_LOAN_CONTRACT,
+        flashLoanArbitrageABI,
+        wallet
+      );
+      
+      // Check if intermediary tokens are set up
+      let tokenCount = 0;
+      try {
+        while (true) {
+          const token = await flashLoanContract.intermediaryTokens(tokenCount);
+          console.log(`   Intermediary token ${tokenCount}: ${token}`);
+          tokenCount++;
+          if (tokenCount > 10) break; // Safety check
+        }
+      } catch (e) {
+        console.log(`   Total intermediary tokens: ${tokenCount}`);
+      }
+    } catch (stateError) {
+      console.log(`   Error checking contract state: ${stateError.message}`);
+    }
+    
     return false;
   }
 }
 
+// Make aaveReservesMap a module-level variable to access it from anywhere
+let aaveReservesMap = {};
+
+async function loadAaveReservesData() {
+  try {
+    console.log("🔄 Loading Aave reserves data...");
+    const dataPath = path.join(__dirname, "../data/aave-reserves.json");
+    
+    if (!fs.existsSync(dataPath)) {
+      console.warn("⚠️ Aave reserves data file not found. Run get-aave-reserves.ts first.");
+      return {};
+    }
+    
+    const data = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
+    console.log(`✅ Loaded data for ${data.reserves.length} Aave reserves`);
+    
+    // Create mapping of token address -> reserve data
+    const reservesMap = {};
+    data.reserves.forEach(reserve => {
+      reservesMap[reserve.address.toLowerCase()] = {
+        symbol: reserve.symbol,
+        isActive: reserve.isActive,
+        flashLoanEnabled: reserve.flashLoanEnabled,
+        ltv: reserve.ltv,
+        liquidationThreshold: reserve.liquidationThreshold
+      };
+    });
+    
+    // Store in the module-level variable
+    aaveReservesMap = reservesMap;
+    return reservesMap;
+  } catch (error) {
+    console.error(`❌ Error loading Aave reserves data: ${error.message}`);
+    return {};
+  }
+}
+
 // Ejecutar el monitor desde la inicialización
-console.log(`🚀 Monitor de Arbitraje FlashLoan v3.0`);
+console.log(`🚀 Monitor de Arbitraje FlashLoan v4.0`);
 console.log(`   Ejecución habilitada: ${IS_EXECUTION_ENABLED ? 'Sí' : 'No'}`);
 console.log(`   Umbral de beneficio: $${MIN_PROFIT_USD} (después de todos los costos)`);
 initialize().catch(console.error);

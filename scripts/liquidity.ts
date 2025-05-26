@@ -109,7 +109,6 @@ async function main() {
     'balancer_ethereum',   // Pools grandes ($144M+)
     'sushiswap',           // Pool de WBTC/WETH ($22M)
     'ethervista',          // Pool de alta liquidez ($406K+)
-    'x7-finance-ethereum', // Varios pools con liquidez
     'defi_swap',           // Pool CRO/ETH ($445K)
     'shibaswap',           // Pool SHIB/WETH ($3.9M)
     'hopeswap',            // Tiene un pool de $40K
@@ -123,7 +122,6 @@ async function main() {
     'elk_finance_ethereum',// Pool de $6.8K
     'standard_ethereum',   // Pequeños pools
     'swapr_ethereum',      // Pequeños pools
-    'x7-finance',          // Algunos pools pequeños
     'saitaswap-ethereum',  // Pool de $6K
     'kyberswap_elastic',   // Algunos pools
     'apeswap_ethereum',    // Pequeños pools

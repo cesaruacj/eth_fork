@@ -266,8 +266,7 @@ contract DexAggregator {
         Smardex,      // 23
         Solidly,      // 24
         Swapr,        // 25
-        Verse,       // 26
-        X7Finance  // 27
+        Verse       // 26
 
     }
 
@@ -335,7 +334,6 @@ contract DexAggregator {
         isV2Like[DexType.Solidly] = true;
         isV2Like[DexType.Swapr] = true;
         isV2Like[DexType.Verse] = true;
-        isV2Like[DexType.X7Finance] = true;
 
         // V3-like interfaces
         isV3Like[DexType.UniswapV3] = true;
@@ -1026,7 +1024,7 @@ contract DexAggregator {
      * @return The name of the DEX
      */
     function getDexName(uint8 dexType) external view returns (string memory) {
-        require(uint256(dexType) < 27, "Invalid DEX type");
+        require(uint256(dexType) <= 26, "Invalid DEX type");
         
         if (dexType == uint8(DexType.UniswapV2)) return "UniswapV2"; // 0
         if (dexType == uint8(DexType.UniswapV3)) return "UniswapV3"; // 1
@@ -1056,7 +1054,6 @@ contract DexAggregator {
         if (dexType == uint8(DexType.Solidly)) return "Solidly"; // 24
         if (dexType == uint8(DexType.Swapr)) return "Swapr"; // 25
         if (dexType == uint8(DexType.Verse)) return "Verse"; // 26
-        if (dexType == uint8(DexType.X7Finance)) return "X7Finance"; // 27
 
         // Default case if no match found
         return "Unknown";

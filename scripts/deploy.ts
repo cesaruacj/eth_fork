@@ -10,7 +10,7 @@ const GAS_FEE_PATH = path.resolve(__dirname, "../data/gasFee.json");
 async function main() {
     // 1. Actualizar información de gas
     try {
-        execSync('npx hardhat run scripts/gasFee.ts --network localhost', { stdio: 'inherit' });
+        execSync('npx hardhat run scripts/gasFee.ts --network mainnet', { stdio: 'inherit' });
     } catch {
         console.warn("⚠️ No se pudo actualizar información de gas.");
     }

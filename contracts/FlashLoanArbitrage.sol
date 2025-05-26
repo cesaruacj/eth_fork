@@ -50,6 +50,15 @@ contract FlashLoanArbitrage is Ownable, ReentrancyGuard, IFlashLoanSimpleReceive
     event DebugLog(string message, uint256 value);
     event DebugTokenPath(string operation, address baseToken, address quoteToken);
     event DebugTokenOperation(address token, uint256 amountBefore, uint256 amountAfter);
+    event DebugExecuteOperation(string step, address asset, uint256 amount);
+    event DebugSwapAttempt(uint256 dexIndex, address tokenIn, address tokenOut, uint256 amount);
+    event DebugSwapResult(uint256 amountOut, bool success);
+    event DebugArbitrageStep(string step, address token, uint256 amount);
+    event DebugSwapCall(uint8 dexType, address tokenIn, address tokenOut, uint256 amountIn);
+    event DebugMessage(string message); // Evento agregado para mensajes de depuración
+    event DebugSwapFailure(string reason, uint256 dexIndex, address tokenIn, address tokenOut);
+    event DebugBalanceCheck(string stage, address token, uint256 balance);
+    event DebugApproval(address token, address spender, uint256 amount);
 
     /**
      * @dev Constructor initializes the contract with Aave provider and DexAggregator
@@ -85,27 +94,15 @@ contract FlashLoanArbitrage is Ownable, ReentrancyGuard, IFlashLoanSimpleReceive
      * @param asset Token a pedir prestado
      * @param amount Cantidad
      */
-    function executeFlashLoanSimple(address asset, uint256 amount) external onlyOwner {
-        emit DebugLog("1. Inicio executeFlashLoanSimple", amount);
-        require(amount > 0, "Amount must be greater than 0");
-        emit DebugLog("2. Amount > 0", amount);
+    function executeFlashLoanSimple(address asset, uint256 amount) external {
+        emit DebugArbitrageStep("Starting flash loan request", asset, amount);
         
-        require(asset != address(0), "Invalid asset address");
-        emit DebugLog("3. Asset es valido", 0);
-        
-        // Comprobar balance antes del flash loan
-        uint256 balanceBefore = IERC20(asset).balanceOf(address(this));
-        emit DebugLog("4. Balance antes", balanceBefore);
-        
-        POOL.flashLoanSimple(
-            address(this),
-            asset,
-            amount,
-            "",
-            0
-        );
-        
-        emit DebugLog("5. FlashLoan completado", 0);
+        try POOL.flashLoanSimple(asset, amount, "", 0, address(this)) {
+            emit DebugArbitrageStep("Flash loan initiated successfully", asset, amount);
+        } catch Error(string memory reason) {
+            emit DebugMessage(string(abi.encodePacked("Flash loan failed: ", reason)));
+            revert(reason);
+        }
     }
 
     /**
@@ -124,7 +121,9 @@ contract FlashLoanArbitrage is Ownable, ReentrancyGuard, IFlashLoanSimpleReceive
         address initiator,
         bytes calldata params
     ) external override returns (bool) {
-        emit DebugLog("6. Inicio executeOperation", amount);
+        emit DebugArbitrageStep("executeOperation called", asset, amount);
+        
+        emit DebugArbitrageStep("Operation started", asset, amount);
         
         require(msg.sender == address(POOL), "Caller must be Aave Pool");
         emit DebugLog("7. Caller es Pool", 0);
@@ -266,13 +265,19 @@ contract FlashLoanArbitrage is Ownable, ReentrancyGuard, IFlashLoanSimpleReceive
                 (bestMidAmountOut * 995) / 1000
             ) returns (uint256 _midAmount) {
                 midAmount = _midAmount;
-                emit DebugLog("Swap successful", midAmount);
+                emit DebugLog("First swap successful", midAmount);
             } catch Error(string memory reason) {
-                emit DebugLog("Swap failed with reason", 0);
-                revert(reason);
-            } catch {
-                emit DebugLog("Swap failed without reason", 0);
-                revert("First swap failed silently");
+                emit DebugSwapFailure(reason, bestFirstDexIndex, tokenIn, bestIntermediaryToken);
+                emit DebugMessage(string(abi.encodePacked("First swap failed: ", reason)));
+                revert(string(abi.encodePacked("First swap failed: ", reason)));
+            } catch Panic(uint errorCode) {
+                emit DebugSwapFailure("Panic", bestFirstDexIndex, tokenIn, bestIntermediaryToken);
+                emit DebugLog("First swap panic", errorCode);
+                revert(string(abi.encodePacked("First swap panic: ", errorCode)));
+            } catch (bytes memory lowLevelData) {
+                emit DebugSwapFailure("Low level failure", bestFirstDexIndex, tokenIn, bestIntermediaryToken);
+                emit DebugMessage("First swap failed with low level error");
+                revert("First swap failed with low level error");
             }
             uint256 balanceAfterSwap1 = IERC20(bestIntermediaryToken).balanceOf(address(this));
             emit DebugTokenOperation(bestIntermediaryToken, balanceBeforeSwap1, balanceAfterSwap1);
@@ -298,9 +303,11 @@ contract FlashLoanArbitrage is Ownable, ReentrancyGuard, IFlashLoanSimpleReceive
                 emit DebugLog("Second swap successful", receivedAmount);
             } catch Error(string memory reason) {
                 emit DebugLog("Second swap failed with reason", 0);
+                emit DebugSwapFailure(reason, bestSecondDexIndex, bestIntermediaryToken, tokenIn);
                 revert(reason);
             } catch {
                 emit DebugLog("Second swap failed without reason", 0);
+                emit DebugSwapFailure("Unknown error", bestSecondDexIndex, bestIntermediaryToken, tokenIn);
                 revert("Second swap failed silently");
             }
             uint256 balanceAfterSwap2 = IERC20(tokenIn).balanceOf(address(this));
@@ -374,7 +381,6 @@ contract FlashLoanArbitrage is Ownable, ReentrancyGuard, IFlashLoanSimpleReceive
         dexAggregator.addDex(DexAggregator.DexType.Swapr, 0xB9960d9bcA016e9748bE75dd52F02188B9d0829f, address(0));
         dexAggregator.addDex(DexAggregator.DexType.Solidly, 0x77784f96C936042A3ADB1dD29C91a55EB2A4219f, address(0));
         dexAggregator.addDex(DexAggregator.DexType.Verse, 0xB4B0ea46Fe0E9e8EAB4aFb765b527739F2718671, address(0));
-        dexAggregator.addDex(DexAggregator.DexType.X7Finance, 0x6b5422D584943BC8Cd0E10e239d624c6fE90fbB8, address(0));
     }
 
     /**

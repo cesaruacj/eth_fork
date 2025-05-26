@@ -39,11 +39,11 @@ async function main() {
       deployer
     );
 
-    for (let i = 0; i < 28; i++) {
+    for (let i = 0; i < 27; i++) {
       try {
         console.log(`DEX ${i}: ${await dexAggregator.getDexName(i)}`);
       } catch (e) {
-        console.log(`DEX ${i}: no configurado o error`);
+        console.log(`DEX ${i}: error - ${e.message}`);
       }
     }
   } catch (error) {
