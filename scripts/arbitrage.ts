@@ -759,7 +759,21 @@ async function processOpportunities(opportunities: ArbitrageOpportunity[]) {
   
   // Ejecutar la mejor oportunidad si hay cualquier beneficio positivo neto
   if (IS_EXECUTION_ENABLED && wallet) {
-    const bestOpportunity = opportunities[0];
+    // At the beginning of processOpportunities function, add:
+    let validOpportunities = [];
+    for (const opp of opportunities) {
+      const isAvailable = await isTokenAvailableForFlashloan(opp.flashLoanToken);
+      if (isAvailable) {
+        validOpportunities.push(opp);
+      }
+    }
+
+    if (validOpportunities.length === 0) {
+      console.log("\n❌ No se encontraron oportunidades con tokens disponibles en Aave");
+      return;
+    }
+
+    let bestOpportunity = validOpportunities[0];
     
     if (bestOpportunity.netProfitUSD > MIN_PROFIT_USD * 1.5) {
       console.log(`\n⚡ Verificando rentabilidad para la mejor oportunidad...`);
@@ -809,6 +823,9 @@ async function processOpportunities(opportunities: ArbitrageOpportunity[]) {
 // Reemplazar la función executeFlashLoan con esta versión optimizada para MEV
 
 async function executeFlashLoan(opportunity: ArbitrageOpportunity): Promise<boolean> {
+  // Get ETH price for USD conversion
+  const ethPriceUSD = await getEthPriceFromChainlink();
+  
   if (!wallet) {
     console.log("❌ No hay wallet configurada");
     return false;
@@ -818,6 +835,13 @@ async function executeFlashLoan(opportunity: ArbitrageOpportunity): Promise<bool
   const buyDexIndex = DEX_NAME_TO_INDEX[opportunity.buyDex];
   const sellDexIndex = DEX_NAME_TO_INDEX[opportunity.sellDex];
   
+  // Move these variable declarations outside the try block
+  let tokenContract;
+  let decimals;
+  let symbol;
+  let flashLoanAmount;
+  let initialTokenBalance;
+  
   try {
     // Log detailed transaction parameters
     console.log(`\n🔍 DEBUG Transaction details:`);
@@ -825,25 +849,24 @@ async function executeFlashLoan(opportunity: ArbitrageOpportunity): Promise<bool
     console.log(`   Sell DEX: ${opportunity.sellDex} (Index: ${sellDexIndex})`);
     
     // Get token info
-    const tokenContract = new ethers.Contract(
+    tokenContract = new ethers.Contract(
       opportunity.flashLoanToken,
       erc20ABI,
       hardhatProvider
     );
     
-    const decimals = await tokenContract.decimals();
-    const symbol = await tokenContract.symbol();
-    const flashLoanAmount = ethers.utils.parseUnits(opportunity.flashLoanAmount, decimals);
-    
-    console.log(`   Token: ${symbol} (${opportunity.flashLoanToken})`);
-    console.log(`   Amount: ${ethers.utils.formatUnits(flashLoanAmount, decimals)}`);
+    decimals = await tokenContract.decimals();
+    symbol = await tokenContract.symbol();
+    flashLoanAmount = ethers.utils.parseUnits(opportunity.flashLoanAmount, decimals);
     
     // Get initial balances
     const initialEthBalance = await wallet.getBalance();
-    let initialTokenBalance;
-    if (tokenContract) {
-      initialTokenBalance = await tokenContract.balanceOf(wallet.address);
-    }
+    const initialEthBalanceETH = parseFloat(ethers.utils.formatEther(initialEthBalance));
+    const initialEthBalanceUSD = initialEthBalanceETH * ethPriceUSD;
+    initialTokenBalance = await tokenContract.balanceOf(wallet.address);
+    
+    console.log(`💰 Initial ETH balance: ${initialEthBalanceETH.toFixed(4)} ETH ($${initialEthBalanceUSD.toFixed(2)} USD)`);
+    console.log(`💰 Initial ${symbol} balance: ${ethers.utils.formatUnits(initialTokenBalance, decimals)} ${symbol}`);
     
     // Flash loan contract
     const flashLoanContract = new ethers.Contract(
@@ -916,13 +939,23 @@ async function executeFlashLoan(opportunity: ArbitrageOpportunity): Promise<bool
     
     // Verificar balances post-transacción
     const finalEthBalance = await wallet.getBalance();
+    const finalEthBalanceETH = parseFloat(ethers.utils.formatEther(finalEthBalance));
+    const finalEthBalanceUSD = finalEthBalanceETH * ethPriceUSD;
     const ethDifference = finalEthBalance.sub(initialEthBalance);
-    console.log(`📊 Cambio en ETH: ${ethers.utils.formatEther(ethDifference)} ETH`);
+    const ethDifferenceETH = parseFloat(ethers.utils.formatEther(ethDifference));
+    const ethDifferenceUSD = ethDifferenceETH * ethPriceUSD;
+    
+    console.log(`📊 Change in ETH: ${ethDifferenceETH.toFixed(6)} ETH ($${ethDifferenceUSD.toFixed(2)} USD)`);
     
     if (tokenContract) {
       const finalTokenBalance = await tokenContract.balanceOf(wallet.address);
       const tokenDifference = finalTokenBalance.sub(initialTokenBalance);
-      console.log(`📊 Cambio en ${symbol}: ${ethers.utils.formatUnits(tokenDifference, decimals)}`);
+      console.log(`📊 Change in ${symbol}: ${ethers.utils.formatUnits(tokenDifference, decimals)} ${symbol}`);
+    }
+    
+    console.log(`💰 Final ETH balance: ${finalEthBalanceETH.toFixed(4)} ETH ($${finalEthBalanceUSD.toFixed(2)} USD)`);
+    if (tokenContract) {
+      console.log(`💰 Final ${symbol} balance: ${ethers.utils.formatUnits(finalTokenBalance, decimals)} ${symbol}`);
     }
     
     return true;
@@ -965,6 +998,32 @@ async function executeFlashLoan(opportunity: ArbitrageOpportunity): Promise<bool
       }
     } catch (stateError) {
       console.log(`   Error checking contract state: ${stateError.message}`);
+    }
+    
+    // Add this to the catch block to show final balances even after errors
+    console.log("\n💰 Balance check after failed transaction:");
+    try {
+      const finalEthBalance = await wallet.getBalance();
+      const finalEthBalanceETH = parseFloat(ethers.utils.formatEther(finalEthBalance));
+      const finalEthBalanceUSD = finalEthBalanceETH * ethPriceUSD;
+      console.log(`💰 Final ETH balance: ${finalEthBalanceETH.toFixed(4)} ETH ($${finalEthBalanceUSD.toFixed(2)} USD)`);
+      
+      // First check if we have the token address from the opportunity
+      if (opportunity && opportunity.flashLoanToken) {
+        // Create a new contract instance if needed
+        const tokenAddress = opportunity.flashLoanToken;
+        const tempTokenContract = new ethers.Contract(tokenAddress, erc20ABI, hardhatProvider);
+        const tempDecimals = await tempTokenContract.decimals();
+        const tempSymbol = await tempTokenContract.symbol();
+        const finalTokenBalance = await tempTokenContract.balanceOf(wallet.address);
+        console.log(`💰 Final ${tempSymbol} balance: ${ethers.utils.formatUnits(finalTokenBalance, tempDecimals)} ${tempSymbol}`);
+      } else if (tokenContract && symbol && decimals) {
+        // Use existing contract if available
+        const finalTokenBalance = await tokenContract.balanceOf(wallet.address);
+        console.log(`💰 Final ${symbol} balance: ${ethers.utils.formatUnits(finalTokenBalance, decimals)} ${symbol}`);
+      }
+    } catch (balanceError) {
+      console.log(`   Error checking final balances: ${balanceError.message}`);
     }
     
     return false;

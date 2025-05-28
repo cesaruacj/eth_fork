@@ -424,6 +424,10 @@ contract FlashLoanArbitrage is Ownable, ReentrancyGuard, IFlashLoanSimpleReceive
         intermediaryTokens.push(0xdC035D45d973E3EC169d2276DDab16f1e407384F); // USDS
         intermediaryTokens.push(0xA1290d69c65A6Fe4DF752f95823fae25cB99e5A7); // rsETH
         intermediaryTokens.push(0x8236a87084f8B84306f72007F36F2618A5634494); // LBTC
+        intermediaryTokens.push(0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0); // wstETH
+        intermediaryTokens.push(0x18084fbA666a33d37592fA2633fD49a74DD93a88); // tBTC
+        intermediaryTokens.push(0xae78736Cd615f374D3085123A210448E74Fc6393); // rETH
+        intermediaryTokens.push(0xA35b1B31Ce002FBF2058D22F30f95D405200A15b); // ETHx
 
     }
 
