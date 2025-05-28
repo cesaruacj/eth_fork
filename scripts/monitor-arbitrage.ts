@@ -9,7 +9,7 @@ dotenv.config();
 // Configuration
 // ================================
 const MIN_PROFIT_PERCENT = 0.5;       // Mínimo porcentaje de beneficio antes de costos
-const MIN_PROFIT_USD = 50;            // Mínimo beneficio en USD después de todos los gastos
+const MIN_PROFIT_USD = 0.25;            // Mínimo beneficio en USD después de todos los gastos
 const IS_EXECUTION_ENABLED = true;    // Establecer en false para solo monitoreo
 const MAX_GAS_PRICE_GWEI = 30;        // Precio máximo de gas para permitir ejecución
 const MAX_SLIPPAGE_PERCENT = 0.5;     // Slippage máximo aceptable

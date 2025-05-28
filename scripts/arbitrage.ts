@@ -136,37 +136,27 @@ async function setupContracts() {
 
 // Función de inicialización
 async function initialize() {
-  console.log("🔄 Initializing arbitrage system...");
-  
-  // First, initialize wallet
-  await initWallet();
-  
-  // Then set up flashbots
-  await setupFlashbots();
-  
-  // Get gas data
-  currentGasData = await getOptimizedGasData();
-  
-  // Load Aave reserves data
-  const aaveReserves = await loadAaveReservesData();
-  
-  // Only set up contracts if wallet is properly initialized
-  if (wallet) {
+  try {
+    await initWallet();
+    await setupFlashbots();
+    currentGasData = await getOptimizedGasData();
+    await loadAaveReservesData();
+    const poolData = await loadPoolData();
+    await updateDexInfo(poolData);
     await setupContracts();
-    console.log("✅ Contracts initialized successfully");
-  } else {
-    console.log("⚠️ No wallet available - running in monitoring mode only");
+    await monitor();
+  } catch (error) {
+    console.error("❌ Error en la inicialización:", error.message);
+    process.exit(1);
   }
-  
-  await monitor();
 }
 
 // Modificar updateDexInfo para cargar todos los DEXes disponibles
 async function updateDexInfo(dexPoolsData: any) {
-  // Carga los datos de todos los DEXes
   DEXES = Object.keys(dexPoolsData);
-  console.log(`🔍 Cargados ${DEXES.length} DEXes desde dexespools.json`);
-  
+  if (!DEXES.length) {
+    throw new Error("❌ No se encontraron DEXES en los datos de pools.");
+  }
   // Crear DEX_INFO dinámicamente usando el mapeo completo
   DEX_INFO = {};
   let unmappedCount = 0;
@@ -196,14 +186,14 @@ async function updateDexInfo(dexPoolsData: any) {
 // ================================
 // Configuration
 // ================================
-const MIN_PROFIT_PERCENT = 0.001;       // Mínimo porcentaje de beneficio antes de costos
-const MIN_PROFIT_USD = 0.01;            // Mínimo beneficio en USD después de todos los gastos
+const MIN_PROFIT_PERCENT = 0.05;       // Mínimo porcentaje de beneficio antes de costos
+const MIN_PROFIT_USD = 0.25;            // Mínimo beneficio en USD después de todos los gastos
 const IS_EXECUTION_ENABLED = true;    // Establecer en false para solo monitoreo
-const MAX_GAS_PRICE_GWEI = 40;        // Precio máximo de gas para permitir ejecución
-const MAX_SLIPPAGE_PERCENT = 0.2;     // Slippage máximo aceptable
-const MIN_LIQUIDITY_USD = 5000;     // Liquidez mínima para considerar un pool ($5K)
+const MAX_GAS_PRICE_GWEI = 30;        // Precio máximo de gas para permitir ejecución
+const MAX_SLIPPAGE_PERCENT = 0.5;     // Slippage máximo aceptable
+const MIN_LIQUIDITY_USD = 100000;     // Liquidez mínima para considerar un pool
 const FLASH_LOAN_FEE = 0.0005;        // Prima de préstamo flash de AAVE (0.05%)
-const GAS_LIMIT_ARBITRAGE = 900000;   // Estimación de límite de gas para arbitraje
+const GAS_LIMIT_ARBITRAGE = 800000;   // Estimación de límite de gas para arbitraje
 
 // Direcciones de contratos desplegados
 const FLASH_LOAN_CONTRACT = DEPLOYED_CONTRACTS.FLASH_LOAN_ARBITRAGE;
@@ -258,21 +248,35 @@ interface ArbitrageOpportunity {
   flashLoanFeeUSD: number;    // Prima del préstamo flash en USD
 }
 
+// --- Wallet y provider robustos ---
+let provider: any;
+let wallet: any;
+
+if (process.env.PRIVATE_KEY && process.env.RPC_URL) {
+  provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL);
+  wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+  console.log(`✅ Wallet inicializada con PRIVATE_KEY: ${wallet.address}`);
+} else {
+  console.error("❌ PRIVATE_KEY o RPC_URL no definidos en .env. Abortando.");
+  process.exit(1);
+}
+
 // Configuración de provider y wallet
 const hardhatProvider = ethers.provider;
 
-let wallet;
 async function initWallet() {
+  if (wallet) return; // Ya inicializada arriba
   try {
     const signers = await ethers.getSigners();
     if (signers && signers.length > 0) {
       wallet = signers[0];
       console.log(`✅ Wallet initialized: ${wallet.address}`);
     } else {
-      console.log("❌ No signers available from Hardhat");
+      throw new Error("❌ No signers available from Hardhat");
     }
   } catch (error) {
     console.error("❌ Error initializing wallet:", error.message);
+    process.exit(1);
   }
 }
 
@@ -487,13 +491,10 @@ function extractPrices(dexPoolsData: any, tokenList: Record<string, string>): To
   
   // Verificar que DEXES y DEX_INFO estén correctamente inicializados
   if (!DEXES || DEXES.length === 0) {
-    console.error('⚠️ Error: DEXES no está inicializado. Ejecuta updateDexInfo() primero.');
-    return [];
+    throw new Error('DEXES no inicializado. updateDexInfo() falló.');
   }
-  
   if (!DEX_INFO || Object.keys(DEX_INFO).length === 0) {
-    console.error('⚠️ Error: DEX_INFO no está inicializado. Ejecuta updateDexInfo() primero.');
-    return [];
+    throw new Error('DEX_INFO no inicializado. updateDexInfo() falló.');
   }
   
   // Procesar cada DEX
@@ -698,7 +699,7 @@ async function findArbitrageOpportunities(prices: TokenPrice[]): Promise<Arbitra
           
           // Determinar token de préstamo flash (preferir stablecoins)
           let flashLoanToken, flashLoanAmount;
-          
+
           if (['USDC', 'USDT', 'DAI'].includes(buyPrice.quoteTokenSymbol)) {
             flashLoanToken = buyPrice.quoteToken;
             flashLoanAmount = (maxTradeSize / 2).toFixed(2); // Mitad del tamaño máximo de operación
@@ -706,6 +707,11 @@ async function findArbitrageOpportunities(prices: TokenPrice[]): Promise<Arbitra
             flashLoanToken = buyPrice.baseToken;
             const tokenAmount = maxTradeSize / buyPrice.price / 2; 
             flashLoanAmount = tokenAmount.toFixed(6);
+          }
+          
+          // Solo agregar oportunidades si el token de préstamo está en las reservas de AAVE
+          if (!AAVE_TOKENS.includes(flashLoanToken.toLowerCase())) {
+            continue;
           }
           
           opportunities.push({
@@ -928,8 +934,15 @@ async function executeFlashLoan(opportunity: ArbitrageOpportunity): Promise<bool
         
         console.log("✅ Bundle enviado a Flashbots para los próximos 3 bloques");
       } catch (error) {
-        console.warn(`⚠️ Error enviando bundle a Flashbots: ${error.message}`);
+        console.warn("⚠️ Error enviando a Flashbots, usando transacción normal.");
+        // Fallback a transacción normal
+        const tx = await wallet.sendTransaction(unsignedTx);
+        console.log(`✅ Transaction sent: ${tx.hash}`);
       }
+    } else {
+      // Si no hay flashbotsProvider, usa transacción normal
+      const tx = await wallet.sendTransaction(unsignedTx);
+      console.log(`✅ Transaction sent: ${tx.hash}`);
     }
     
     // Esperar por cualquier confirmación (la primera que llegue)
@@ -1066,6 +1079,16 @@ async function loadAaveReservesData() {
     return {};
   }
 }
+
+// Cargar lista de tokens de AAVE desde addresses.ts
+import { AAVE_TOKENS_6, AAVE_TOKENS_8, AAVE_TOKENS_18 } from "../config/addresses";
+
+// Unifica todos los tokens de AAVE en un solo array de direcciones (en minúsculas)
+const AAVE_TOKENS = [
+  ...Object.values(AAVE_TOKENS_6),
+  ...Object.values(AAVE_TOKENS_8),
+  ...Object.values(AAVE_TOKENS_18)
+].map(addr => addr.toLowerCase());
 
 // Ejecutar el monitor desde la inicialización
 console.log(`🚀 Monitor de Arbitraje FlashLoan v4.0`);
