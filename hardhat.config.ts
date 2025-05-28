@@ -49,7 +49,7 @@ const config: HardhatUserConfig = {
     mainnet: {
       url: "https://eth-mainnet.g.alchemy.com/v2/JDR4rpYy7x_w4r0Z0P5QV9W-f_H7DqZ7",
       chainId: 1, // ID de cadena de Ethereum Mainnet REAL
-      accounts: [process.env.PRIVATE_KEY].filter(Boolean) // Asegura que la clave privada esté definida
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [] 
     }
   },
   etherscan: {
