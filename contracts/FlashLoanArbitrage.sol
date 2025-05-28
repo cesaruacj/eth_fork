@@ -97,7 +97,7 @@ contract FlashLoanArbitrage is Ownable, ReentrancyGuard, IFlashLoanSimpleReceive
     function executeFlashLoanSimple(address asset, uint256 amount) external {
         emit DebugArbitrageStep("Starting flash loan request", asset, amount);
         
-        try POOL.flashLoanSimple(asset, amount, "", 0, address(this)) {
+        try POOL.flashLoanSimple(address(this), address(asset), amount, "", 0) {
             emit DebugArbitrageStep("Flash loan initiated successfully", asset, amount);
         } catch Error(string memory reason) {
             emit DebugMessage(string(abi.encodePacked("Flash loan failed: ", reason)));
