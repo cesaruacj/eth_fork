@@ -169,16 +169,18 @@ async function updateDexInfo(dexPoolsData: any) {
   
   // Crear DEX_INFO dinámicamente usando el mapeo completo
   DEX_INFO = {};
+  let unmappedCount = 0;
+  
   for (const dex of DEXES) {
     let name = dex.replace(/_/g, ' ').replace(/-/g, ' ');
     
     // Use the existing DEX_NAME_TO_INDEX mapping to get the correct type
     let type = DEX_NAME_TO_INDEX[dex];
     
-    // If the DEX is not in our mapping, assign a default type
+    // If the DEX is not in our mapping, silently assign a default type
     if (type === undefined) {
-      console.warn(`⚠️ DEX '${dex}' not found in DEX_NAME_TO_INDEX mapping, assigning type 0`);
       type = 0;
+      unmappedCount++;
     }
     
     DEX_INFO[dex] = { name, type };
@@ -187,8 +189,8 @@ async function updateDexInfo(dexPoolsData: any) {
   console.log(`✅ ${Object.keys(DEX_INFO).length} DEXes configurados para arbitraje`);
   
   // Log which DEXes were mapped successfully
-  const mappedCount = Object.values(DEX_INFO).filter(info => info.type !== 0).length;
-  console.log(`📊 ${mappedCount} DEXes mapeados a índices específicos, ${Object.keys(DEX_INFO).length - mappedCount} usando índice por defecto`);
+  const mappedCount = Object.values(DEX_INFO).filter(info => info.type !== 0 || DEX_NAME_TO_INDEX[info.name] === 0).length;
+  console.log(`📊 ${mappedCount} DEXes mapeados a índices específicos, ${unmappedCount} usando índice por defecto`);
 }
 
 // ================================
