@@ -330,7 +330,7 @@ async function isTokenAvailableForFlashloan(tokenAddress: string): Promise<boole
     console.log(`Token ${symbol}: Data found in JSON - isActive: ${tokenData.isActive}, flashLoanEnabled: ${tokenData.flashLoanEnabled}`);
     return tokenData.isActive && tokenData.flashLoanEnabled;
   } catch (error) {
-    console.log(`Error checking token ${tokenAddress.substring(0, 10)}...: ${error.message}`);
+    console.log(`Error checking token ${tokenAddress.substring(0, 38)}...: ${error.message}`);
     return false;
   }
 }
@@ -991,7 +991,7 @@ async function executeFlashLoan(opportunity: ArbitrageOpportunity): Promise<bool
           const token = await flashLoanContract.intermediaryTokens(tokenCount);
           console.log(`   Intermediary token ${tokenCount}: ${token}`);
           tokenCount++;
-          if (tokenCount > 10) break; // Safety check
+          if (tokenCount > 38) break; // Safety check
         }
       } catch (e) {
         console.log(`   Total intermediary tokens: ${tokenCount}`);
