@@ -125,9 +125,10 @@ async function setupContracts() {
     console.log(`✅ Intermediary tokens already configured (first: ${firstToken})`);
   } catch (error) {
     console.log("🔄 Setting up intermediary tokens...");
+    const feeData = await hardhatProvider.getFeeData();
     const tx = await flashLoanContract.setupIntermediaryTokens({
-      maxFeePerGas: ethers.utils.parseUnits("2.0", "gwei"),     // Mayor que el baseFeePerGas actual
-      maxPriorityFeePerGas: ethers.utils.parseUnits("0.5", "gwei")
+      maxFeePerGas: feeData.maxFeePerGas,
+      maxPriorityFeePerGas: feeData.maxPriorityFeePerGas
     });
     await tx.wait();
     console.log("✅ Intermediary tokens configured");
